@@ -2,8 +2,10 @@ import os
 import logging
 import shutil
 from datetime import datetime
+import requests
 
 from graphpipeline.datasource.datasourceinstance import DataSourceInstance
+from graphpipeline.datasource.helper.downloader import list_ftp_dir
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +84,7 @@ class RemoteDataSource(BaseDataSource):
 
     def __init__(self, root_dir):
         super(RemoteDataSource, self).__init__(root_dir)
+        self.remote_files = []
 
     def download(self):
         raise NotImplementedError
@@ -105,6 +108,46 @@ class RemoteDataSource(BaseDataSource):
                 instances_in_process.append(instance)
         return instances_in_process
 
+    def check_remote_files(self):
+        """
+        Check if all URLs registered at self.remote_files are available.
+
+        :return: dict with available/unavailable URLs.
+        """
+        out = {'found': [], 'not_found': []}
+        for url in self.remote_files:
+
+            if url.startswith('http://') or url.startswith('https://'):
+                try:
+                    status_code = requests.head(url, allow_redirects=True).status_code
+                    if status_code == 200:
+                        out['found'].append(url)
+                    else:
+                        out['not_found'].append(url)
+                except Exception as e:
+                    out['not_found'].append(url)
+
+            elif url.startswith('ftp://'):
+                try:
+                    # get the parent directory
+                    # remove trailing slash in directory names
+                    if url.endswith('/'):
+                        formatted_url = url[:-1]
+                    else:
+                        formatted_url = url
+                    # get parent directory
+                    parent_url, filename = formatted_url.strip().rsplit('/', 1)
+                    print(parent_url, filename)
+                    files = list_ftp_dir(parent_url)
+                    if filename in [f.name for f in files]:
+                        out['found'].append(url)
+                except Exception as e:
+                    out['not_found'].append(url)
+
+            else:
+                out['not_found'].append(url)
+
+        return out
 
 class RollingReleaseRemoteDataSource(RemoteDataSource):
 

@@ -22,27 +22,39 @@ class ParserSet:
         """
         Fist merge all NodeSets, then merge all RelationshipSets in the ParserSet.
         """
-        for p in self.parsers:
-            for nodeset in p.container.nodesets:
-                nodeset.create_index(graph)
-                nodeset.merge(graph)
+        self.merge_nodes(graph)
+        self.merge_relationships(graph)
+
+    def merge_relationships(self, graph):
         for p in self.parsers:
             for relset in p.container.relationshipsets:
                 relset.create_index(graph)
                 relset.merge(graph)
 
+    def merge_nodes(self, graph):
+        for p in self.parsers:
+            for nodeset in p.container.nodesets:
+                nodeset.create_index(graph)
+                nodeset.merge(graph)
+
     def create(self, graph):
         """
         Fist merge all NodeSets, then merge all RelationshipSets in the ParserSet.
         """
-        for p in self.parsers:
-            for nodeset in p.container.nodesets:
-                nodeset.create_index(graph)
-                nodeset.create(graph)
+        self.create_nodes(graph)
+        self.create_relationships(graph)
+
+    def create_relationships(self, graph):
         for p in self.parsers:
             for relset in p.container.relationshipsets:
                 relset.create_index(graph)
                 relset.create(graph)
+
+    def create_nodes(self, graph):
+        for p in self.parsers:
+            for nodeset in p.container.nodesets:
+                nodeset.create_index(graph)
+                nodeset.create(graph)
 
     def _reset(self):
         for p in self.parsers:
