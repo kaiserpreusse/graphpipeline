@@ -5,7 +5,7 @@ import datetime
 import re
 import logging
 
-from datacroaker.helper import filehandler
+from graphpipeline.datasource.helper import filehandler
 
 log = logging.getLogger(__name__)
 

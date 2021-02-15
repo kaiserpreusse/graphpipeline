@@ -3,7 +3,7 @@ import logging
 import shutil
 from datetime import datetime
 
-from datacroaker.datasourceinstance import DataSourceInstance
+from graphpipeline.datasource.datasourceinstance import DataSourceInstance
 
 log = logging.getLogger(__name__)
 
