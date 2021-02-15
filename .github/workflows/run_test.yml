@@ -17,6 +17,29 @@ jobs:
       matrix:
         python-version: [3.7, 3.8, 3.9]
 
+    services:
+      neo4j35:
+        image: neo4j:3.5
+        ports:
+          - 8687:7687
+          - 8474:7474
+        env:
+          NEO4J_AUTH: neo4j/test
+      neo4j41:
+        image: neo4j:3.1
+        ports:
+          - 9687:7687
+          - 9474:7474
+        env:
+          NEO4J_AUTH: neo4j/test
+      neo4j42:
+        image: neo4j:4.2
+        ports:
+          - 10687:7687
+          - 10474:7474
+        env:
+          NEO4J_AUTH: neo4j/test
+    
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
