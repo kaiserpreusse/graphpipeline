@@ -1,5 +1,6 @@
 import pytest
 import logging
+import os
 from py2neo import Graph
 from py2neo.wiring import WireError
 from py2neo.client import ConnectionUnavailable
@@ -12,11 +13,20 @@ log = logging.getLogger(__name__)
 
 NEO4J_PASSWORD = 'test'
 
-NEO4J_VERSIONS = [
-    {'github_actions_host': 'neo4j35', 'version': '3.5', 'ports': (8474, 8473, 8687), 'uri_prefix': 'bolt'},
-    {'github_actions_host': 'neo4j41', 'version': '4.1', 'ports': (9474, 9473, 9687), 'uri_prefix': 'bolt'},
-    {'github_actions_host': 'neo4j42', 'version': '4.2', 'ports': (10474, 10473, 10687), 'uri_prefix': 'bolt'}
-]
+RUNS_ON = os.getenv('RUNS_ON', None)
+
+if RUNS_ON == 'github_actions':
+    NEO4J_VERSIONS = [
+        {'host': 'neo4j35', 'version': '3.5', 'ports': (7474, 7473, 7687), 'uri_prefix': 'bolt'},
+        {'host': 'neo4j41', 'version': '4.1', 'ports': (7474, 7473, 7687), 'uri_prefix': 'bolt'},
+        {'host': 'neo4j42', 'version': '4.2', 'ports': (7474, 7473, 7687), 'uri_prefix': 'bolt'}
+    ]
+else:
+    NEO4J_VERSIONS = [
+        {'host': 'localhost', 'version': '3.5', 'ports': (8474, 8473, 8687), 'uri_prefix': 'bolt'},
+        {'host': 'localhost', 'version': '4.1', 'ports': (9474, 9473, 9687), 'uri_prefix': 'bolt'},
+        {'host': 'localhost', 'version': '4.2', 'ports': (10474, 10473, 10687), 'uri_prefix': 'bolt'}
+    ]
 
 @pytest.fixture(scope='session')
 def wait_for_neo4j():
@@ -32,7 +42,7 @@ def wait_for_neo4j():
             # throw a ServiceUnavailable error
             for v in NEO4J_VERSIONS:
                 # get Graph, bolt connection to localhost is default
-                graph = Graph(password=NEO4J_PASSWORD, port=v['ports'][2], scheme='bolt')
+                graph = Graph(host=v['host'], password=NEO4J_PASSWORD, port=v['ports'][2], scheme='bolt')
                 graph.run("MATCH (n) RETURN n LIMIT 1")
             connected = True
 
@@ -46,7 +56,7 @@ def wait_for_neo4j():
 
 @pytest.fixture(scope='session', params=NEO4J_VERSIONS)
 def graph(request, wait_for_neo4j):
-    yield Graph(host=request.param['github_actions_host'], password=NEO4J_PASSWORD, port=request.param['ports'][2], scheme='bolt')
+    yield Graph(host=request.param['host'], password=NEO4J_PASSWORD, port=request.param['ports'][2], scheme='bolt')
 
 
 @pytest.fixture
