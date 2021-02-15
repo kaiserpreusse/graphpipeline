@@ -39,7 +39,7 @@ jobs:
           - 10474:7474
         env:
           NEO4J_AUTH: neo4j/test
-    
+
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}

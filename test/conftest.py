@@ -23,7 +23,7 @@ def wait_for_neo4j():
 
     # check availability for both containers
     connected = False
-    max_retries = 120
+    max_retries = 180
     retries = 0
 
     while not connected:
@@ -46,7 +46,7 @@ def wait_for_neo4j():
 
 @pytest.fixture(scope='session', params=NEO4J_VERSIONS)
 def graph(request, wait_for_neo4j):
-    yield Graph(password=NEO4J_PASSWORD, port=request.param['ports'][2], scheme='bolt')
+    yield Graph(host='localhost', password=NEO4J_PASSWORD, port=request.param['ports'][2], scheme='bolt')
 
 
 @pytest.fixture
