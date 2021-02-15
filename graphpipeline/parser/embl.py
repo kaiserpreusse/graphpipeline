@@ -354,7 +354,7 @@ class _RecordSegment(object):
 
     Splits lines in ID and Value.
 
-    Used for operations like: Get all lines starting with "FT", merge all lines starting with "RA".
+    Used for operations like: Get all lines starting with "FT", run_and_merge all lines starting with "RA".
     """
 
     def __init__(self, lines):
@@ -434,8 +434,8 @@ def _merge_lines_prefix(lines, line_id, join_char=None):
     """
     Merge all lines beginning with a specific ID.
 
-    :param lines: Lines to parse and merge.
-    :param line_id: Line ID to merge.
+    :param lines: Lines to parse and run_and_merge.
+    :param line_id: Line ID to run_and_merge.
     :param join_char: Character for string join.
     :return: Joined lines.
     """

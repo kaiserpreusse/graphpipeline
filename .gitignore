@@ -302,3 +302,4 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/python,jetbrains+all,linux,windows,macos
+local.py

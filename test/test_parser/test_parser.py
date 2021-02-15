@@ -1,25 +1,41 @@
-from graphpipeline.parser import ReturnParser
+import pytest
+
+from graphpipeline.parser import ReturnParser,ParserSet
 from graphio import NodeSet, RelationshipSet
 
 
-def test_parser_container(tmp_path):
+@pytest.fixture
+def TestParserClass():
     class TestParser(ReturnParser):
         def __init__(self, root_dir):
             super(TestParser, self).__init__(root_dir)
 
-            self.mynodes = NodeSet(['Test'], merge_keys=['uuid'])
-            self.myrels = RelationshipSet('FOO', ['Test'], ['Target'], ['uuid'], ['target_id'])
+            self.source = NodeSet(['Source'], merge_keys=['source_id'])
+            self.target = NodeSet(['Target'], merge_keys=['target_id'])
+            self.rels = RelationshipSet('FOO', ['Source'], ['Target'], ['source_id'], ['target_id'])
 
-    p = TestParser(tmp_path)
+        def run_with_mounted_arguments(self):
+            self.run()
 
-    p.mynodes.add_node({'uuid': 'abc123'})
-    p.myrels.add_relationship({'uuid': 'abc123'}, {'target_id': '12345'}, {'source': 'test'})
+        def run(self):
+            for i in range(100):
+                self.source.add_node({'source_id': i})
+                self.target.add_node({'target_id': i})
+                self.rels.add_relationship({'source_id': i}, {'target_id': i}, {'source': 'test'})
 
-    assert len(list(p.container.nodesets)) == 1
-    assert len((p.container.relationshipsets)) == 1
+    return TestParser
 
-    for nodeset in p.container.nodesets:
+
+@pytest.fixture
+def test_parser_with_data(TestParserClass, tmp_path):
+    p = TestParserClass(tmp_path)
+    p.run()
+    return p
+
+
+def test_parser_container(test_parser_with_data):
+    for nodeset in test_parser_with_data.container.nodesets:
         assert isinstance(nodeset, NodeSet)
 
-    for relset in p.container.relationshipsets:
+    for relset in test_parser_with_data.container.relationshipsets:
         assert isinstance(relset, RelationshipSet)
