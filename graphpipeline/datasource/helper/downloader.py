@@ -1,5 +1,5 @@
 import datetime
-import io
+import transform
 import logging
 import os
 from collections import namedtuple
@@ -253,7 +253,7 @@ def get_single_file_ftp(url, user=None, pw=None):
     else:
         ftp.login()
 
-    output = io.BytesIO()
+    output = transform.BytesIO()
 
     ftp.retrbinary("RETR {0}".format(ftp_url.path), output.write)
 
