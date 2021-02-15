@@ -14,10 +14,12 @@ jobs:
 
     runs-on: ubuntu-latest
     env:
-      RUNS_ON: 'github_actions'
+      RUN_ENVIRONMENT: 'github_actions'
     strategy:
       matrix:
         python-version: [3.7, 3.8, 3.9]
+    container:
+      image: ubuntu
 
     services:
       neo4j35:

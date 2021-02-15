@@ -13,9 +13,9 @@ log = logging.getLogger(__name__)
 
 NEO4J_PASSWORD = 'test'
 
-RUNS_ON = os.getenv('RUNS_ON', None)
+RUN_ENVIRONMENT = os.getenv('RUN_ENVIRONMENT', None)
 
-if RUNS_ON == 'github_actions':
+if RUN_ENVIRONMENT == 'github_actions':
     NEO4J_VERSIONS = [
         {'host': 'neo4j35', 'version': '3.5', 'ports': (7474, 7473, 7687), 'uri_prefix': 'bolt'},
         {'host': 'neo4j41', 'version': '4.1', 'ports': (7474, 7473, 7687), 'uri_prefix': 'bolt'},
@@ -33,7 +33,7 @@ def wait_for_neo4j():
 
     # check availability for both containers
     connected = False
-    max_retries = 180
+    max_retries = 120
     retries = 0
 
     while not connected:
@@ -56,7 +56,7 @@ def wait_for_neo4j():
 
 @pytest.fixture(scope='session', params=NEO4J_VERSIONS)
 def graph(request, wait_for_neo4j):
-    yield Graph(host=request.param['host'], password=NEO4J_PASSWORD, port=request.param['ports'][2], scheme='bolt')
+    yield Graph(host=request.param['host'], password=NEO4J_PASSWORD, port=request.param['ports'][2], scheme='bolt', secure=False)
 
 
 @pytest.fixture
