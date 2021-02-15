@@ -13,13 +13,9 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+
     env:
       RUN_ENVIRONMENT: 'github_actions'
-    strategy:
-      matrix:
-        python-container: [python:3.7, python:3.8, python:3.9]
-    container:
-      image: ${{ matrix.python-container }}
 
     services:
       neo4j35:
@@ -34,6 +30,14 @@ jobs:
         image: neo4j:4.2
         env:
           NEO4J_AUTH: neo4j/test
+
+#    strategy:
+#      matrix:
+#        python-container: [python:3.7]
+
+#    container: ${{ matrix.python-container }}
+
+    container: python:3.7
 
     steps:
     - uses: actions/checkout@v2
