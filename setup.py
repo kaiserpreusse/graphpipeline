@@ -3,7 +3,12 @@ from setuptools import setup, find_packages
 from os import path
 
 setup(name='graphpipeline',
-      version='0.0.1',
+      use_scm_version={
+          "root": ".",
+          "relative_to": __file__,
+          "local_scheme": "node-and-timestamp"
+      },
+      setup_requires=['setuptools_scm'],
       description='Framework for managing source data and loading it into Neo4j.',
       url='https://github.com/kaiserpreusse/graphpipeline',
       author='Martin Preusse',
