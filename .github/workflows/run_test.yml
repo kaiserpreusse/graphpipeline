@@ -31,13 +31,11 @@ jobs:
         env:
           NEO4J_AUTH: neo4j/test
 
-#    strategy:
-#      matrix:
-#        python-container: [python:3.7]
+    strategy:
+      matrix:
+        python-container: ["python:3.7", "python:3.8", "python:3.9"]
 
-#    container: ${{ matrix.python-container }}
-
-    container: python:3.7
+    container: ${{ matrix.python-container }}
 
     steps:
     - uses: actions/checkout@v2
