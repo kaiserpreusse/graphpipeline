@@ -28,6 +28,30 @@ class Parser:
     def get_nodeset(self, labels, merge_keys):
         return self.container.get_nodeset(labels, merge_keys)
 
+    @property
+    def container(self):
+        container = Container()
+        for k, o in self.__dict__.items():
+            if isinstance(o, NodeSet) or isinstance(o, RelationshipSet):
+                container.add(o)
+        return container
+
+    def merge(self, graph):
+        for nodeset in self.container.nodesets:
+            nodeset.create_index(graph)
+            nodeset.merge(graph)
+        for relset in self.container.relationshipsets:
+            relset.create_index(graph)
+            relset.merge(graph)
+
+    def create(self, graph):
+        for nodeset in self.container.nodesets:
+            nodeset.create_index(graph)
+            nodeset.create(graph)
+        for relset in self.container.relationshipsets:
+            relset.create_index(graph)
+            relset.create(graph)
+
     def run_with_mounted_arguments(self):
         """
         Unified interface_dev to run the parser. Does not take parameters (all necessary
@@ -92,5 +116,3 @@ class YieldParser(Parser):
 
     def __init__(self, root_dir):
         super(YieldParser, self).__init__(root_dir)
-
-        self.container = Container()

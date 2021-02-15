@@ -26,13 +26,6 @@ def TestParserClass():
     return TestParser
 
 
-def test_parserset_run(TestParserClass, tmp_path):
-    some_parser = TestParserClass(tmp_path)
-    ps = ParserSet()
-    ps.parsers.append(some_parser)
-
-    ps.run()
-
 @pytest.mark.neo4j
 def test_parserset_merge(clear_graph, TestParserClass, tmp_path, graph):
     """
@@ -63,6 +56,36 @@ def test_parserset_merge(clear_graph, TestParserClass, tmp_path, graph):
 
     result = graph.run("MATCH (s:Source)-[r:FOO]->(t:Target) RETURN count(distinct r) AS count").data()
     assert result[0]['count'] == len(some_parser.rels.relationships)
+
+
+@pytest.mark.neo4j
+def test_parserset_create(clear_graph, TestParserClass, tmp_path, graph):
+    """
+    Use the TestParser, run_and_create it, count graph elements. Merge again, count again.
+
+    Only testing number of nodes in this most basic test. The number of relationships depends on the
+    properties chosen to identify source/target.
+    """
+
+    some_parser = TestParserClass(tmp_path)
+    ps = ParserSet()
+    ps.parsers.append(some_parser)
+
+    ps.run_and_create(graph)
+
+    result = graph.run("MATCH (s:Source) RETURN count(distinct s) AS count").data()
+    assert result[0]['count'] == len(some_parser.source.nodes)
+
+    result = graph.run("MATCH (t:Target) RETURN count(distinct t) AS count").data()
+    assert result[0]['count'] == len(some_parser.target.nodes)
+
+    ps.run_and_create(graph)
+
+    result = graph.run("MATCH (s:Source) RETURN count(distinct s) AS count").data()
+    assert result[0]['count'] == 2*len(some_parser.source.nodes)
+
+    result = graph.run("MATCH (t:Target) RETURN count(distinct t) AS count").data()
+    assert result[0]['count'] == 2*len(some_parser.target.nodes)
 
 
 @pytest.mark.neo4j

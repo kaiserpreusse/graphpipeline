@@ -1,6 +1,7 @@
 import pytest
 
-from graphpipeline.parser import ReturnParser,ParserSet
+from graphpipeline.parser import ReturnParser, ParserSet
+from graphpipeline.parser.parser import YieldParser
 from graphio import NodeSet, RelationshipSet
 
 
@@ -39,3 +40,61 @@ def test_parser_container(test_parser_with_data):
 
     for relset in test_parser_with_data.container.relationshipsets:
         assert isinstance(relset, RelationshipSet)
+
+
+
+class TestYieldParser:
+
+    @pytest.fixture(scope='class')
+    def SimpleTestYieldParser(self):
+        class SimpleTestYieldParser(YieldParser):
+
+            def __init__(self, root_dir):
+                super(SimpleTestYieldParser, self).__init__(root_dir)
+
+                self.source = NodeSet(['YieldSource'], merge_keys=['uid'])
+
+            def run_with_mounted_arguments(self):
+                self.run()
+
+            def run(self):
+                self.source.nodes = self.yield_node_function()
+
+            def yield_node_function(self):
+                for i in range(100):
+                    yield {'uid': i}
+
+        return SimpleTestYieldParser
+
+    @pytest.mark.neo4j
+    def test_simple_yield_parser_merge(self, clear_graph, graph, tmp_path, SimpleTestYieldParser):
+
+
+        yield_parser = SimpleTestYieldParser(tmp_path)
+        yield_parser.run_with_mounted_arguments()
+
+        yield_parser.merge(graph)
+
+        result = graph.run("MATCH (n:YieldSource) RETURN count(distinct n) AS count").data()
+        assert result[0]['count'] == 100
+
+        yield_parser.merge(graph)
+
+        result = graph.run("MATCH (n:YieldSource) RETURN count(distinct n) AS count").data()
+        assert result[0]['count'] == 100
+
+    @pytest.mark.neo4j
+    def test_simple_yield_parser_create(self, clear_graph, graph, tmp_path, SimpleTestYieldParser):
+        yield_parser = SimpleTestYieldParser(tmp_path)
+        yield_parser.run_with_mounted_arguments()
+
+        yield_parser.create(graph)
+
+        result = graph.run("MATCH (n:YieldSource) RETURN count(distinct n) AS count").data()
+        assert result[0]['count'] == 100
+
+        yield_parser.run_with_mounted_arguments()
+        yield_parser.create(graph)
+
+        result = graph.run("MATCH (n:YieldSource) RETURN count(distinct n) AS count").data()
+        assert result[0]['count'] == 200
