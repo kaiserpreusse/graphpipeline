@@ -17,8 +17,8 @@ RUN_ENVIRONMENT = os.getenv('RUN_ENVIRONMENT', None)
 
 if RUN_ENVIRONMENT == 'github_actions':
     NEO4J_VERSIONS = [
-        # {'host': 'neo4j35', 'version': '3.5', 'ports': (7474, 7473, 7687), 'uri_prefix': 'bolt'},
-        # {'host': 'neo4j41', 'version': '4.1', 'ports': (7474, 7473, 7687), 'uri_prefix': 'bolt'},
+        {'host': 'neo4j35', 'version': '3.5', 'ports': (7474, 7473, 7687), 'uri_prefix': 'bolt'},
+        {'host': 'neo4j41', 'version': '4.1', 'ports': (7474, 7473, 7687), 'uri_prefix': 'bolt'},
         {'host': 'neo4j42', 'version': '4.2', 'ports': (7474, 7473, 7687), 'uri_prefix': 'bolt'}
     ]
 else:
