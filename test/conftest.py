@@ -13,9 +13,9 @@ log = logging.getLogger(__name__)
 NEO4J_PASSWORD = 'test'
 
 NEO4J_VERSIONS = [
-    {'version': '3.5', 'ports': (8474, 8473, 8687), 'uri_prefix': 'bolt'},
-    {'version': '4.1', 'ports': (9474, 9473, 9687), 'uri_prefix': 'bolt'},
-    {'version': '4.2', 'ports': (10474, 10473, 10687), 'uri_prefix': 'bolt'}
+    {'github_actions_host': 'neo4j35', 'version': '3.5', 'ports': (8474, 8473, 8687), 'uri_prefix': 'bolt'},
+    {'github_actions_host': 'neo4j41', 'version': '4.1', 'ports': (9474, 9473, 9687), 'uri_prefix': 'bolt'},
+    {'github_actions_host': 'neo4j42', 'version': '4.2', 'ports': (10474, 10473, 10687), 'uri_prefix': 'bolt'}
 ]
 
 @pytest.fixture(scope='session')
@@ -46,7 +46,7 @@ def wait_for_neo4j():
 
 @pytest.fixture(scope='session', params=NEO4J_VERSIONS)
 def graph(request, wait_for_neo4j):
-    yield Graph(host='localhost', password=NEO4J_PASSWORD, port=request.param['ports'][2], scheme='bolt')
+    yield Graph(host=request.param['github_actions_host'], password=NEO4J_PASSWORD, port=request.param['ports'][2], scheme='bolt')
 
 
 @pytest.fixture
