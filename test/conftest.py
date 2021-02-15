@@ -2,6 +2,7 @@ import pytest
 import logging
 from py2neo import Graph
 from py2neo.wiring import WireError
+from py2neo.client import ConnectionUnavailable
 
 from time import sleep
 
@@ -32,11 +33,12 @@ def wait_for_neo4j():
             for v in NEO4J_VERSIONS:
                 # get Graph, bolt connection to localhost is default
                 graph = Graph(password=NEO4J_PASSWORD, port=v['ports'][2], scheme='bolt')
-                graph.run("MATCH (n) RETURN n LIMIT 1").data()
+                graph.run("MATCH (n) RETURN n LIMIT 1")
             connected = True
 
-        except (ConnectionRefusedError, WireError, ConnectionResetError):
+        except (ConnectionRefusedError, WireError, ConnectionResetError, ConnectionUnavailable):
             retries += 1
+            log.warning(f"Connection unavailable on try {retries}. Try again in 1 second.")
             if retries > max_retries:
                 break
             sleep(1)
