@@ -60,13 +60,24 @@ class ParserSet:
         for p in self.parsers:
             p._reset_parser()
 
-    def merge_sequential(self, graph: Graph):
+    def run_and_merge_sequential(self, graph: Graph):
         """
-        Run parsers one by one, run_and_merge NodeSets. Run again, run_and_merge RelationshipSets.
+        Merge NodeSets. Run again, merge RelationshipSets.
 
         This function is used when memory is limited to avoid collecting too much data in memroy.
         """
-        pass
+        for parser in self.parsers:
+            parser.run_with_mounted_arguments()
+            for ns in parser.container.nodesets:
+                ns.merge(graph)
+            parser._reset_parser()
+
+        # run again to create relationships
+        for parser in self.parsers:
+            parser.run_with_mounted_arguments()
+            for rs in parser.container.relationshipsets:
+                rs.merge(graph)
+            parser._reset_parser()
 
     def run_and_merge(self, graph: Graph):
         """
