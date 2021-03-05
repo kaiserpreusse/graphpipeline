@@ -17,22 +17,28 @@ log = logging.getLogger(__name__)
 
 
 def download_latest(datasource_class_name: str, import_path: str, root_dir: str, download_arguments: dict = None):
+    # set empty download_arguments dictionary if not passed
+    if not download_arguments:
+        download_arguments = {}
     module = importlib.import_module(import_path)
     datasource_class = getattr(module, datasource_class_name)
 
     ds = datasource_class(root_dir)
-    ds.download(**download_arguments)
+    ds.download(ds.latest_remote_version(), **download_arguments)
     
     return ds.ds_dir
 
 
 def download_latest_if_not_exists(datasource_class_name: str, import_path: str, root_dir: str, download_arguments: dict = None):
+    # set empty download_arguments dictionary if not passed
+    if not download_arguments:
+        download_arguments = {}
     module = importlib.import_module(import_path)
     datasource_class = getattr(module, datasource_class_name)
-
     ds = datasource_class(root_dir)
+
     if not ds.latest_local_instance(**download_arguments):
-        ds.download(**download_arguments)
+        ds.download(ds.latest_remote_version(), **download_arguments)
 
     return ds.ds_dir
 
@@ -197,6 +203,7 @@ class RollingReleaseRemoteDataSource(RemoteDataSource):
         super(RollingReleaseRemoteDataSource, self).__init__(root_dir)
 
     def download(self, *args, **kwargs):
+        print(args, kwargs)
         self.pre_download()
 
         instance = DataSourceInstance(self)
@@ -208,7 +215,7 @@ class RollingReleaseRemoteDataSource(RemoteDataSource):
             instance.prepare_download()
 
             # run the download function defined in the implementing class.
-            self.download_function(instance, *args, **kwargs)
+            self.download_function(instance, **kwargs)
 
             instance.wrap_up()
         except:
@@ -256,9 +263,12 @@ class ManyVersionsRemoteDataSource(RemoteDataSource):
         instance.version = str(version)
 
         try:
+            print(instance)
+            print('download')
+            print(kwargs)
             instance.prepare_download()
 
-            self.download_function(instance, version, *args, **kwargs)
+            self.download_function(instance, version, **kwargs)
 
             instance.wrap_up()
         except:
@@ -308,7 +318,7 @@ class SingleVersionRemoteDataSource(RemoteDataSource):
 
             if self.version_downloadable(version):
                 # run the download function defined in the implementing class.
-                self.download_function(instance, version, *args, **kwargs)
+                self.download_function(instance, version, **kwargs)
             instance.wrap_up()
 
         except:
