@@ -39,6 +39,8 @@ def download_latest_if_not_exists(datasource_class_name: str, import_path: str, 
 
     if not ds.latest_local_instance(**download_arguments):
         ds.download(ds.latest_remote_version(), **download_arguments)
+    else:
+        log.info(f'Found local instance at {ds.latest_local_instance(**download_arguments).instance_dir}')
 
     return ds.ds_dir
 
@@ -111,6 +113,8 @@ class BaseDataSource():
 
         :return: The latest local instance.
         """
+        if not download_arguments:
+            download_arguments = {}
         latest = None
         for instance in self.instances_local:
             if instance.download_arguments == download_arguments:
@@ -345,7 +349,10 @@ class DataSourceInstance():
         else:
             self.ds_dir = self.datasource.ds_dir
 
-        self.download_arguments = download_arguments
+        if download_arguments:
+            self.download_arguments = download_arguments
+        else:
+            self.download_arguments = {}
 
         # property for time of instantiation
         self.instance_created = datetime.now()
@@ -397,7 +404,7 @@ class DataSourceInstance():
                         formatted_properties[k] = v
 
             # create instance and set attributes
-            datasourceinstance = cls(datasource, formatted_properties['uuid'])
+            datasourceinstance = cls(datasource, uuid=formatted_properties['uuid'])
 
             for k, v in formatted_properties.items():
                 # TODO make sure not to store the directories in metadata instead of skipping here
@@ -421,7 +428,7 @@ class DataSourceInstance():
         output_dict = {}
 
         for k, v in self.__dict__.items():
-            if not k.startswith('__') and not callable(v) and '_dir' not in k:
+            if not k.startswith('__') and not k.startswith('datasource') and not callable(v) and '_dir' not in k:
                 output_dict[k] = getattr(self, k)
 
         with open(instance_metadata_path, 'w') as f:
