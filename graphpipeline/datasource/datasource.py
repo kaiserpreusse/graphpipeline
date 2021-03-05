@@ -33,12 +33,14 @@ def download_latest_if_not_exists(datasource_class_name: str, import_path: str, 
     # set empty download_arguments dictionary if not passed
     if not download_arguments:
         download_arguments = {}
+    print(datasource_class_name, import_path, root_dir, download_arguments)
     module = importlib.import_module(import_path)
     datasource_class = getattr(module, datasource_class_name)
     ds = datasource_class(root_dir)
 
     if not ds.latest_local_instance(**download_arguments):
         ds.download(ds.latest_remote_version(), **download_arguments)
+
     else:
         log.info(f'Found local instance at {ds.latest_local_instance(**download_arguments).instance_dir}')
 
@@ -138,6 +140,9 @@ class RemoteDataSource(BaseDataSource):
         super(RemoteDataSource, self).__init__(root_dir)
         self.remote_files = []
 
+    def latest_remote_version(self):
+        return None
+
     def download(self):
         raise NotImplementedError
 
@@ -207,6 +212,8 @@ class RollingReleaseRemoteDataSource(RemoteDataSource):
         super(RollingReleaseRemoteDataSource, self).__init__(root_dir)
 
     def download(self, *args, **kwargs):
+        if not kwargs:
+            kwargs = {}
         print(args, kwargs)
         self.pre_download()
 
