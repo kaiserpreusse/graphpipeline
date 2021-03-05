@@ -79,6 +79,18 @@ class ParserSet:
                 rs.merge(graph)
             parser._reset_parser()
 
+    def create_index(self, graph:Graph):
+        """
+        Create all indices.
+
+        :param graph: py2neo.Graph
+        """
+        for parser in self.parsers:
+            for ns in parser.container.nodesets:
+                ns.create_index(graph)
+            for rs in parser.container.relationshipsets:
+                rs.create_index(graph)
+
     def run_and_merge(self, graph: Graph):
         """
         Run all parser, merge all NodeSets, merge all RelationShip sets.
