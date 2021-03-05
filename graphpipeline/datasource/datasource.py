@@ -26,6 +26,17 @@ def download_latest(datasource_class_name: str, import_path: str, root_dir: str)
     return ds.ds_dir
 
 
+def download_latest_if_not_exists(datasource_class_name: str, import_path: str, root_dir: str):
+    module = importlib.import_module(import_path)
+    datasource_class = getattr(module, datasource_class_name)
+
+    ds = datasource_class(root_dir)
+    if not ds.latest_local_instance():
+        ds.download()
+
+    return ds.ds_dir
+
+
 class BaseDataSource():
 
     def __init__(self, root_dir):
