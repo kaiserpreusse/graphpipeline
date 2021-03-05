@@ -1,18 +1,62 @@
 import logging
+import importlib
+from py2neo import Graph
 from graphio import Container, NodeSet, RelationshipSet
+from typing import List
+
+from graphpipeline.datasource import DataSourceInstance
 
 log = logging.getLogger(__name__)
 
 
+def run_parser_merge_nodes(graph_config: tuple, parser_class_name: str, import_path: str, parser_arguments: dict, datasourceinstances: List[dict]):
+    """
+    Run a parser in a Pool/RPC.
+
+    :param parser_class_name: Name of the parser class.
+    :param import_path: Path where to import from.
+    :param parser_arguments: Arguments for the parser.
+    :param datasourceinstance_dict: serialized DataSourceInstance
+    """
+
+    graph = Graph(graph_config[0], name=graph_config[1])
+
+    module = importlib.import_module(import_path)
+    parser_class = getattr(module, parser_class_name)
+
+    parser = parser_class()
+    # add datasource instances
+    for dsi_dict in datasourceinstances:
+        dsi = DataSourceInstance.from_dict(dsi_dict)
+        parser.datasource_instances.append(dsi)
+    # add arguments
+    for k, v in parser_arguments.items():
+        parser.__dict__[k] = v
+
+    parser.run_with_mounted_arguments()
+
+    for ns in parser.container.nodesets:
+        ns.create_index(graph)
+        ns.merge(graph)
+
+
 class Parser:
 
-    def __init__(self, root_dir):
-
-        self.root_dir = root_dir
+    def __init__(self):
 
         self.datasource_instances = []
 
         self.name = self.__class__.__name__
+        self.arguments = []
+
+    def get_arguments(self) -> dict:
+        """
+        Return a dictionary of Parser run arguments.
+        """
+        parser_arguments = {}
+        for k in self.arguments:
+            parser_arguments[k] = self.__dict__[k]
+        return parser_arguments
 
     def get_instance_by_name(self, name):
         """
@@ -78,8 +122,8 @@ class ReturnParser(Parser):
     """
     TYPE = 'return'
 
-    def __init__(self, root_dir):
-        super(ReturnParser, self).__init__(root_dir)
+    def __init__(self):
+        super(ReturnParser, self).__init__()
 
     @property
     def container(self):

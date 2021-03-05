@@ -1,4 +1,8 @@
 from py2neo import Graph
+from multiprocessing import Pool
+
+from graphpipeline.parser import Parser
+from graphpipeline.parser.parser import run_parser_merge_nodes
 
 
 class ParserSet:
@@ -10,6 +14,14 @@ class ParserSet:
 
     def __init__(self):
         self.parsers = []
+
+    def add(self, parser: Parser):
+        """
+        Add a Parser to this ParserSet.
+
+        :param parser: The parser, a subclass of graphpipeline.parser.Parser
+        """
+        self.parsers.append(parser)
 
     def run_with_mounted_arguments(self):
         """
@@ -59,6 +71,34 @@ class ParserSet:
     def _reset(self):
         for p in self.parsers:
             p._reset_parser()
+
+    def run_and_merge_nodes_parallel(self, graph: dict, import_path: str, pool_size=4):
+        graph_config = (graph.service.profile, graph.name)
+        pool = Pool(pool_size)
+        results = []
+        for parser in self.parsers:
+            results.append(
+                pool.apply_async(
+                    run_parser_merge_nodes, (graph_config, parser.__class__.__name__, import_path, parser.get_arguments(), [dsi.to_dict() for dsi in parser.datasource_instances])
+                )
+            )
+        [r.wait() for r in results]
+
+        pool.close()
+        pool.join()
+
+    def run_and_merge_relationships_sequential(self, graph: Graph):
+        """
+        Merge NodeSets. Run again, merge RelationshipSets.
+
+        This function is used when memory is limited to avoid collecting too much data in memroy.
+        """
+        # run again to create relationships
+        for parser in self.parsers:
+            parser.run_with_mounted_arguments()
+            for rs in parser.container.relationshipsets:
+                rs.merge(graph)
+            parser._reset_parser()
 
     def run_and_merge_sequential(self, graph: Graph):
         """

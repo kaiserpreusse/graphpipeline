@@ -34,6 +34,16 @@ def test_parser_with_data(TestParserClass, tmp_path):
     return p
 
 
+def test_parser_arguments():
+    p = ReturnParser()
+    p.arguments = ['foo', 'bar']
+    p.foo = 'test'
+    p.bar = 'other_test'
+
+    assert p.get_arguments()['foo'] == 'test'
+    assert p.get_arguments()['bar'] == 'other_test'
+
+
 def test_parser_container(test_parser_with_data):
     for nodeset in test_parser_with_data.container.nodesets:
         assert isinstance(nodeset, NodeSet)

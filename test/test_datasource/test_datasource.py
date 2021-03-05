@@ -1,7 +1,7 @@
 import pytest
 
 from graphpipeline.datasource import SingleVersionRemoteDataSource, RollingReleaseRemoteDataSource, \
-    ManyVersionsRemoteDataSource
+    ManyVersionsRemoteDataSource, BaseDataSource
 from graphpipeline.datasource.datasource import RemoteDataSource
 
 
@@ -9,6 +9,20 @@ def test_instances(tmp_path):
     SingleVersionRemoteDataSource(root_dir=tmp_path)
     RollingReleaseRemoteDataSource(root_dir=tmp_path)
     ManyVersionsRemoteDataSource(root_dir=tmp_path)
+
+
+def test_datasource_serialization(tmp_path):
+    class SomeDataSource(RemoteDataSource):
+        def __init__(self, root_dir):
+            super(SomeDataSource, self).__init__(root_dir)
+
+    ds = SomeDataSource(tmp_path)
+
+    ds_dict = ds.to_dict()
+
+    reloaded_datasource = BaseDataSource.from_dict(ds_dict)
+
+    assert reloaded_datasource.to_dict() == ds_dict
 
 
 class TestCheckAvailable:
