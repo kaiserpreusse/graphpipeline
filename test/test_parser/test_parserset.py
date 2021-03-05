@@ -4,31 +4,28 @@ from graphpipeline.parser import ReturnParser,ParserSet
 from graphio import NodeSet, RelationshipSet
 
 
-@pytest.fixture
-def TestParserClass():
-    class TestParser(ReturnParser):
-        def __init__(self, root_dir):
-            super(TestParser, self).__init__(root_dir)
 
-            self.source = NodeSet(['Source'], merge_keys=['source_id'])
-            self.target = NodeSet(['Target'], merge_keys=['target_id'])
-            self.rels = RelationshipSet('FOO', ['Source'], ['Target'], ['source_id'], ['target_id'])
+class SomeTestParser(ReturnParser):
+    def __init__(self):
+        super(SomeTestParser, self).__init__()
 
-        def run_with_mounted_arguments(self):
-            self.run()
+        self.source = NodeSet(['Source'], merge_keys=['source_id'])
+        self.target = NodeSet(['Target'], merge_keys=['target_id'])
+        self.rels = RelationshipSet('FOO', ['Source'], ['Target'], ['source_id'], ['target_id'])
 
-        def run(self):
-            for i in range(100):
-                self.source.add_node({'source_id': i})
-                self.target.add_node({'target_id': i})
-                self.rels.add_relationship({'source_id': i}, {'target_id': i}, {'source': 'test'})
+    def run_with_mounted_arguments(self):
+        self.run()
 
-    return TestParser
+    def run(self):
+        for i in range(100):
+            self.source.add_node({'source_id': i})
+            self.target.add_node({'target_id': i})
+            self.rels.add_relationship({'source_id': i}, {'target_id': i}, {'source': 'test'})
 
 
 class RootTestParser(ReturnParser):
-    def __init__(self, root_dir):
-        super(RootTestParser, self).__init__(root_dir)
+    def __init__(self):
+        super(RootTestParser, self).__init__()
 
         self.source = NodeSet(['Source'], merge_keys=['source_id'])
         self.target = NodeSet(['Target'], merge_keys=['target_id'])
@@ -43,8 +40,8 @@ class RootTestParser(ReturnParser):
 
 class DependingTestParser(ReturnParser):
 
-    def __init__(self, root_dir):
-        super(DependingTestParser, self).__init__(root_dir)
+    def __init__(self):
+        super(DependingTestParser, self).__init__()
         self.rels = RelationshipSet('FOO', ['Source'], ['Target'], ['source_id'], ['target_id'])
 
     def run_with_mounted_arguments(self):
@@ -56,11 +53,11 @@ class DependingTestParser(ReturnParser):
 
 
 @pytest.mark.neo4j
-def test_parserset_merge(clear_graph, TestParserClass, tmp_path, graph):
+def test_parserset_merge(clear_graph, tmp_path, graph):
     """
     Use the TestParser, run_and_merge it, count graph elements. Merge again, count again.
     """
-    some_parser = TestParserClass(tmp_path)
+    some_parser = SomeTestParser()
     ps = ParserSet()
     ps.parsers.append(some_parser)
 
@@ -88,12 +85,12 @@ def test_parserset_merge(clear_graph, TestParserClass, tmp_path, graph):
 
 
 @pytest.mark.neo4j
-def test_parserset_merge_sequential(clear_graph, TestParserClass, tmp_path, graph):
+def test_parserset_merge_sequential(clear_graph, tmp_path, graph):
     """
     Run the merge_sequential function on a ParserSet and assert that all data is in the database.
     """
-    root_parser = RootTestParser(tmp_path)
-    depending_parser = DependingTestParser(tmp_path)
+    root_parser = RootTestParser()
+    depending_parser = DependingTestParser()
 
     ps = ParserSet()
     ps.parsers.append(root_parser)
@@ -128,7 +125,7 @@ def test_parserset_merge_sequential(clear_graph, TestParserClass, tmp_path, grap
 
 
 @pytest.mark.neo4j
-def test_parserset_create(clear_graph, TestParserClass, tmp_path, graph):
+def test_parserset_create(clear_graph, tmp_path, graph):
     """
     Use the TestParser, run_and_create it, count graph elements. Merge again, count again.
 
@@ -136,7 +133,7 @@ def test_parserset_create(clear_graph, TestParserClass, tmp_path, graph):
     properties chosen to identify source/target.
     """
 
-    some_parser = TestParserClass(tmp_path)
+    some_parser = SomeTestParser()
     ps = ParserSet()
     ps.parsers.append(some_parser)
 
@@ -158,12 +155,12 @@ def test_parserset_create(clear_graph, TestParserClass, tmp_path, graph):
 
 
 @pytest.mark.neo4j
-def test_dependency_parserset_merge(clear_graph, tmp_path, graph):
+def test_dependency_parserset_merge(clear_graph, graph):
     """
     Test data loading functionality for two parsers that depend on each other.
     """
-    root_parser = RootTestParser(tmp_path)
-    depending_parser = DependingTestParser(tmp_path)
+    root_parser = RootTestParser()
+    depending_parser = DependingTestParser()
 
     ps = ParserSet()
     ps.parsers.append(root_parser)

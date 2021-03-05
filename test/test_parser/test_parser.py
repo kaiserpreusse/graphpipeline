@@ -9,7 +9,7 @@ from graphio import NodeSet, RelationshipSet
 def TestParserClass():
     class TestParser(ReturnParser):
         def __init__(self, root_dir):
-            super(TestParser, self).__init__(root_dir)
+            super(TestParser, self).__init__()
 
             self.source = NodeSet(['Source'], merge_keys=['source_id'])
             self.target = NodeSet(['Target'], merge_keys=['target_id'])
@@ -59,8 +59,8 @@ class TestYieldParser:
     def SimpleTestYieldParser(self):
         class SimpleTestYieldParser(YieldParser):
 
-            def __init__(self, root_dir):
-                super(SimpleTestYieldParser, self).__init__(root_dir)
+            def __init__(self):
+                super(SimpleTestYieldParser, self).__init__()
 
                 self.source = NodeSet(['YieldSource'], merge_keys=['uid'])
 
@@ -80,7 +80,7 @@ class TestYieldParser:
     def test_simple_yield_parser_merge(self, clear_graph, graph, tmp_path, SimpleTestYieldParser):
 
 
-        yield_parser = SimpleTestYieldParser(tmp_path)
+        yield_parser = SimpleTestYieldParser()
         yield_parser.run_with_mounted_arguments()
 
         yield_parser.merge(graph)
@@ -95,7 +95,7 @@ class TestYieldParser:
 
     @pytest.mark.neo4j
     def test_simple_yield_parser_create(self, clear_graph, graph, tmp_path, SimpleTestYieldParser):
-        yield_parser = SimpleTestYieldParser(tmp_path)
+        yield_parser = SimpleTestYieldParser()
         yield_parser.run_with_mounted_arguments()
 
         yield_parser.create(graph)

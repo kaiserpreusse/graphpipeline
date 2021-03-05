@@ -158,5 +158,5 @@ class YieldParser(Parser):
     """
     TYPE = 'yield'
 
-    def __init__(self, root_dir):
-        super(YieldParser, self).__init__(root_dir)
+    def __init__(self):
+        super(YieldParser, self).__init__()
