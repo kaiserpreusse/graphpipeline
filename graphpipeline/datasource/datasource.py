@@ -16,23 +16,23 @@ from graphpipeline.datasource.helper.downloader import list_ftp_dir
 log = logging.getLogger(__name__)
 
 
-def download_latest(datasource_class_name: str, import_path: str, root_dir: str):
+def download_latest(datasource_class_name: str, import_path: str, root_dir: str, download_arguments: dict = None):
     module = importlib.import_module(import_path)
     datasource_class = getattr(module, datasource_class_name)
 
     ds = datasource_class(root_dir)
-    ds.download()
+    ds.download(**download_arguments)
     
     return ds.ds_dir
 
 
-def download_latest_if_not_exists(datasource_class_name: str, import_path: str, root_dir: str):
+def download_latest_if_not_exists(datasource_class_name: str, import_path: str, root_dir: str, download_arguments: dict = None):
     module = importlib.import_module(import_path)
     datasource_class = getattr(module, datasource_class_name)
 
     ds = datasource_class(root_dir)
-    if not ds.latest_local_instance():
-        ds.download()
+    if not ds.latest_local_instance(**download_arguments):
+        ds.download(**download_arguments)
 
     return ds.ds_dir
 
@@ -99,7 +99,7 @@ class BaseDataSource():
         if os.path.exists(instance_path):
             return DataSourceInstance.read(self, instance_path)
 
-    def latest_local_instance(self):
+    def latest_local_instance(self, **download_arguments):
         """
         Get local instance with latest 'instance_created' property.
 
@@ -107,11 +107,12 @@ class BaseDataSource():
         """
         latest = None
         for instance in self.instances_local:
-            if not latest:
-                latest = instance
-            else:
-                if instance.instance_created > latest.instance_created:
+            if instance.download_arguments == download_arguments:
+                if not latest:
                     latest = instance
+                else:
+                    if instance.instance_created > latest.instance_created:
+                        latest = instance
         return latest
 
 
@@ -201,6 +202,7 @@ class RollingReleaseRemoteDataSource(RemoteDataSource):
         instance = DataSourceInstance(self)
         instance.started = datetime.now()
         instance.download_date = datetime.today()
+        instance.download_arguments = kwargs
 
         try:
             instance.prepare_download()
@@ -249,6 +251,7 @@ class ManyVersionsRemoteDataSource(RemoteDataSource):
         instance = DataSourceInstance(self)
         instance.started = datetime.now()
         instance.download_date = datetime.today()
+        instance.download_arguments = kwargs
 
         instance.version = str(version)
 
@@ -296,6 +299,7 @@ class SingleVersionRemoteDataSource(RemoteDataSource):
         instance = DataSourceInstance(self)
         instance.started = datetime.now()
         instance.download_date = datetime.today()
+        instance.download_arguments = kwargs
 
         instance.version = str(version)
 
@@ -318,7 +322,7 @@ class SingleVersionRemoteDataSource(RemoteDataSource):
 
 class DataSourceInstance():
 
-    def __init__(self, datasource, datasource_directory=None, uuid=None):
+    def __init__(self, datasource, download_arguments = None, datasource_directory=None, uuid=None):
         self.datasource = datasource
 
         if not uuid:
@@ -330,6 +334,8 @@ class DataSourceInstance():
             self.ds_dir = datasource_directory
         else:
             self.ds_dir = self.datasource.ds_dir
+
+        self.download_arguments = download_arguments
 
         # property for time of instantiation
         self.instance_created = datetime.now()
@@ -345,6 +351,7 @@ class DataSourceInstance():
         """
         return dict(
             datasource=self.datasource.to_dict(),
+            download_arguments=self.download_arguments,
             uuid=self.uuid,
             instance_created=self.instance_created,
             process_instance_dir=self.process_instance_dir
@@ -352,7 +359,7 @@ class DataSourceInstance():
 
     @classmethod
     def from_dict(cls, d: dict) -> 'DataSourceInstance':
-        datasourceinstance = cls(BaseDataSource.from_dict(d['datasource']), uuid=d['uuid'])
+        datasourceinstance = cls(BaseDataSource.from_dict(d['datasource']), download_arguments=d['download_arguments'], uuid=d['uuid'])
         datasourceinstance.instance_created = d['instance_created']
 
         return datasourceinstance
@@ -404,7 +411,7 @@ class DataSourceInstance():
         output_dict = {}
 
         for k, v in self.__dict__.items():
-            if not k.startswith('__') and not callable(v) and isinstance(v, str) and '_dir' not in k:
+            if not k.startswith('__') and not callable(v) and '_dir' not in k:
                 output_dict[k] = getattr(self, k)
 
         with open(instance_metadata_path, 'w') as f:
