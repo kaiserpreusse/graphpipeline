@@ -16,7 +16,7 @@ setup(name='graphpipeline',
       license='MIT',
       packages=find_packages(),
       install_requires=[
-          'requests', 'ftputil', 'graphio', 'python-dateutil'
+          'requests', 'ftputil', 'graphio', 'python-dateutil', 'bs4'
       ],
       keywords=['data'],
       zip_safe=False,

@@ -4,16 +4,75 @@ import logging
 import shutil
 from datetime import datetime
 from uuid import uuid4
-
+from pathlib import Path
+from urllib.parse import urlparse, urljoin
+from bs4 import BeautifulSoup
 import requests
 import importlib
-from collections import namedtuple
+import json
 
 from dateutil.parser import parse
 
 from graphpipeline.datasource.helper.downloader import list_ftp_dir
 
 log = logging.getLogger(__name__)
+
+
+def get_links(content):
+    soup = BeautifulSoup(content)
+    for a in soup.findAll('a'):
+        yield a.get('href')
+
+
+def _download(url, target):
+    """
+    Download all files from a http directory to a local directory recursively.
+
+    Note that the first call *has to end with /* otherwise a file with the name of the root dir will be
+    created instead of the directories.
+    """
+    log.debug(f"Download all files from {url} to {target}")
+
+    r = requests.get(url)
+    if r.status_code != 200:
+        raise Exception('status code is {} for {}'.format(r.status_code, url))
+    content = r.text
+    if url.endswith('/'):
+        Path(target).mkdir(parents=True, exist_ok=True)
+        for link in get_links(content):
+            if not link.startswith('.'): # skip hidden files such as .DS_Store
+                _download(urljoin(url, link), os.path.join(target, link))
+    else:
+        with open(target, 'w') as f:
+            f.write(content)
+
+def list_remote_instances(url):
+    log.debug(f"List remote instances for {url}")
+    remote_instances = []
+
+    r = requests.get(url)
+    if r.status_code != 200:
+        raise Exception('status code is {} for {}'.format(r.status_code, url))
+    content = r.text
+
+    for link in get_links(content):
+        if not link.startswith('.'):  # skip hidden files such as .DS_Store
+            log.debug(f"Link found: {link}")
+            instance_url = urljoin(url, link)
+            json_url = urljoin(instance_url, 'metadata.json')
+            log.debug(f"JSON URL {json_url}")
+
+            instance_json = requests.get(json_url)
+
+            if instance_json.status_code != 200:
+                raise Exception('status code is {} for {}'.format(r.status_code, url))
+            content = instance_json.text
+
+            remote_instances.append(
+                DataSourceInstance.from_dict(json.loads(content))
+            )
+
+    return remote_instances
 
 
 def download_latest(datasource_class_name: str, import_path: str, root_dir: str, download_arguments: dict = None):
@@ -24,7 +83,7 @@ def download_latest(datasource_class_name: str, import_path: str, root_dir: str,
     datasource_class = getattr(module, datasource_class_name)
 
     ds = datasource_class(root_dir)
-    ds.download(ds.latest_remote_version(), **download_arguments)
+    ds.__download(ds.latest_remote_version(), **download_arguments)
     
     return ds.ds_dir
 
@@ -39,12 +98,31 @@ def download_latest_if_not_exists(datasource_class_name: str, import_path: str, 
     ds = datasource_class(root_dir)
 
     if not ds.latest_local_instance(**download_arguments):
-        ds.download(ds.latest_remote_version(), **download_arguments)
+        ds.__download(ds.latest_remote_version(), **download_arguments)
 
     else:
         log.info(f'Found local instance at {ds.latest_local_instance(**download_arguments).instance_dir}')
 
     return ds.ds_dir
+
+
+def setify_dict(d: dict) -> dict:
+    """
+    In order to compare __download arguments read from JSON we have to load lists into sets.
+
+    So that:
+        {taxids: ['10090', '9606']} == {taxids: ['9606', '10090'[}
+
+    :param d: The dictionary
+    :return: Dictionary with list as set.
+    """
+    new_d = {}
+    for k,v in d.items():
+        if isinstance(v, list):
+            new_d[k] = set(v)
+        else:
+            new_d[k] = v
+    return new_d
 
 
 class BaseDataSource():
@@ -93,6 +171,56 @@ class BaseDataSource():
             if 'error_' not in instance and 'process_' not in instance and not instance.startswith('.'):
                 yield self.get_instance_by_uuid(instance)
 
+    def list_remote_instances(self, url):
+        if not url.endswith('/'):
+            url = url+'/'
+        datasource_url = url+self.name+'/'
+
+        return list_remote_instances(datasource_url)
+
+    def latest_remote_instance(self, url, argument_check: bool = True, **download_arguments):
+        """
+        Get local instance with latest 'instance_created' property.
+
+        :return: The latest local instance.
+        """
+        if not download_arguments:
+            download_arguments = {}
+        latest = None
+
+        # only return instances where the __download arguments match (default, argument_check = True)
+        if argument_check:
+            for instance in self.list_remote_instances(url):
+                if setify_dict(instance.download_arguments) == setify_dict(download_arguments):
+                    if not latest:
+                        latest = instance
+                    else:
+                        if instance.instance_created > latest.instance_created:
+                            latest = instance
+        # return all latest instances, don't check for __download arguments (argument_check = False)
+        else:
+            for instance in self.list_remote_instances(url):
+                if not latest:
+                    latest = instance
+                else:
+                    if instance.instance_created > latest.instance_created:
+                        latest = instance
+
+        return latest
+
+    def pull_latest_from_remote(self, url, argument_check: bool = True, **download_arguments):
+        log.debug(f"Pull latest remote version of {self.name} from {url}")
+        latest_remote_instance = self.latest_remote_instance(url, argument_check, **download_arguments)
+
+        if latest_remote_instance:
+            datasource_url = urljoin(url, self.name)
+            log.debug(f"Datasource URL {datasource_url}")
+            latest_remote_instance_url = f"{datasource_url}/{latest_remote_instance.uuid}"
+            log.debug(f"Instance URL: {latest_remote_instance_url}")
+
+            _download(f"{latest_remote_instance_url}/", os.path.join(self.ds_dir, latest_remote_instance.uuid))
+
+
     def clear_datasource_directory(self):
         """
         Delete all local instances.
@@ -119,16 +247,16 @@ class BaseDataSource():
             download_arguments = {}
         latest = None
 
-        # only return instances where the download arguments match (default, argument_check = True)
+        # only return instances where the __download arguments match (default, argument_check = True)
         if argument_check:
             for instance in self.instances_local:
-                if instance.download_arguments == download_arguments:
+                if setify_dict(instance.download_arguments) == setify_dict(download_arguments):
                     if not latest:
                         latest = instance
                     else:
                         if instance.instance_created > latest.instance_created:
                             latest = instance
-        # return all latest instances, don't check for download arguments (argument_check = False)
+        # return all latest instances, don't check for __download arguments (argument_check = False)
         else:
             for instance in self.instances_local:
                 if not latest:
@@ -226,7 +354,7 @@ class RollingReleaseRemoteDataSource(RemoteDataSource):
     def download(self, *args, **kwargs):
         if not kwargs:
             kwargs = {}
-        print(args, kwargs)
+
         self.pre_download()
 
         instance = DataSourceInstance(self)
@@ -237,7 +365,7 @@ class RollingReleaseRemoteDataSource(RemoteDataSource):
         try:
             instance.prepare_download()
 
-            # run the download function defined in the implementing class.
+            # run the __download function defined in the implementing class.
             self.download_function(instance, **kwargs)
 
             instance.wrap_up()
@@ -273,7 +401,7 @@ class ManyVersionsRemoteDataSource(RemoteDataSource):
         Download a specific version.
 
         :param version: The version.
-        :param taxids: Optional list of taxonomy IDs to limit download.
+        :param taxids: Optional list of taxonomy IDs to limit __download.
         :type version: DataSourceVersion
         """
         self.pre_download()
@@ -286,9 +414,7 @@ class ManyVersionsRemoteDataSource(RemoteDataSource):
         instance.version = str(version)
 
         try:
-            print(instance)
-            print('download')
-            print(kwargs)
+
             instance.prepare_download()
 
             self.download_function(instance, version, **kwargs)
@@ -340,7 +466,7 @@ class SingleVersionRemoteDataSource(RemoteDataSource):
             instance.prepare_download()
 
             if self.version_downloadable(version):
-                # run the download function defined in the implementing class.
+                # run the __download function defined in the implementing class.
                 self.download_function(instance, version, **kwargs)
             instance.wrap_up()
 
@@ -389,8 +515,7 @@ class DataSourceInstance():
             datasource=self.datasource.to_dict(),
             download_arguments=self.download_arguments,
             uuid=self.uuid,
-            instance_created=self.instance_created,
-            process_instance_dir=self.process_instance_dir
+            instance_created=self.instance_created
         )
 
     @classmethod
@@ -426,7 +551,6 @@ class DataSourceInstance():
             datasourceinstance = cls(datasource, uuid=formatted_properties['uuid'])
 
             for k, v in formatted_properties.items():
-                # TODO make sure not to store the directories in metadata instead of skipping here
                 if '_dir' not in k:
                     setattr(datasourceinstance, k, v)
 
@@ -444,14 +568,8 @@ class DataSourceInstance():
     def store(self):
         instance_metadata_path = os.path.join(self.process_instance_dir, 'metadata.json')
 
-        output_dict = {}
-
-        for k, v in self.__dict__.items():
-            if not k.startswith('__') and not k.startswith('datasource') and not callable(v) and '_dir' not in k:
-                output_dict[k] = getattr(self, k)
-
         with open(instance_metadata_path, 'w') as f:
-            json.dump(output_dict, f, indent=4, sort_keys=True, default=str)
+            json.dump(self.to_dict(), f, indent=4, sort_keys=True, default=str)
 
     def wrap_up(self):
         """

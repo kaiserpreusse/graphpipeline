@@ -4,3 +4,4 @@ graphio
 requests
 ftputil
 python-dateutil
+bs4
