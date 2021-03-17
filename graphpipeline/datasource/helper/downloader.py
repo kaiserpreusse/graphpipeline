@@ -90,16 +90,16 @@ def download_file(remote_url, local_file_path):
         raise AttributeError("Neither downloadable http(s) or ftp URL: {0}".format(remote_url))
 
 
-def _download_file_http(u, f):
+def _download_file_http(u, path):
     r = requests.get(u, stream=True)
 
     if r.status_code == 200:
-        with open(f, 'wb') as f:
+        with open(path, 'wb') as f:
             for chunk in r.iter_content(chunk_size=1024):
                 if chunk:
                     f.write(chunk)
                     f.flush()
-        return f
+        return path
 
     else:
         raise ValueError("URL can't be retrieved. Status code: {0}. URL: {1}".format(r.status_code, u))
@@ -111,6 +111,8 @@ def _download_file_ftp(url, filepath, user=None, pw=None):
 
     Return text if possible.
     """
+    retries = 3
+
     # add 'ftp://' to form a parsable URL in case a path is passed
     if not url.startswith("ftp://"):
         url = 'ftp://' + url
@@ -122,19 +124,28 @@ def _download_file_ftp(url, filepath, user=None, pw=None):
 
     log.debug("Parsed URL: {0}".format(ftp_url))
 
-    ftp = FTP(ftp_url.netloc)
+    # try download n times, return if successful
+    for i in range(retries):
+        try:
+            ftp = FTP(ftp_url.netloc)
 
-    if user:
-        ftp.login(user=user, passwd=pw)
-    else:
-        ftp.login()
+            if user:
+                ftp.login(user=user, passwd=pw)
+            else:
+                ftp.login()
 
-    with open(filepath, 'wb') as f:
+            with open(filepath, 'wb') as f:
 
-        ftp.retrbinary("RETR {0}".format(ftp_url.path), f.write)
+                ftp.retrbinary("RETR {0}".format(ftp_url.path), f.write)
 
-    ftp.close()
-    return filepath
+            ftp.close()
+            return filepath
+
+        except EOFError as e:
+            log.error(f"Download of {ftp_url.path} not successful on try {i+1}, try again.")
+            log.error(e)
+
+    raise ValueError(f"File {ftp_url.path} not available")
 
 
 def download_directory_from_ftp(remote_url, source, target, user=None, pw=None, overwrite=None, file_blacklist=None,

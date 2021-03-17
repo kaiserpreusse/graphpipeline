@@ -109,7 +109,7 @@ class BaseDataSource():
         if os.path.exists(instance_path):
             return DataSourceInstance.read(self, instance_path)
 
-    def latest_local_instance(self, **download_arguments):
+    def latest_local_instance(self, argument_check: bool = True, **download_arguments):
         """
         Get local instance with latest 'instance_created' property.
 
@@ -118,13 +118,25 @@ class BaseDataSource():
         if not download_arguments:
             download_arguments = {}
         latest = None
-        for instance in self.instances_local:
-            if instance.download_arguments == download_arguments:
+
+        # only return instances where the download arguments match (default, argument_check = True)
+        if argument_check:
+            for instance in self.instances_local:
+                if instance.download_arguments == download_arguments:
+                    if not latest:
+                        latest = instance
+                    else:
+                        if instance.instance_created > latest.instance_created:
+                            latest = instance
+        # return all latest instances, don't check for download arguments (argument_check = False)
+        else:
+            for instance in self.instances_local:
                 if not latest:
                     latest = instance
                 else:
                     if instance.instance_created > latest.instance_created:
                         latest = instance
+
         return latest
 
 
@@ -566,8 +578,7 @@ class DataSourceInstance():
 
         return directories_found
 
-    # TODO fix and adapt
-    def find_files(self, filter_func, version, subpath=None):
+    def find_files(self, filter_func, subpath=None):
         """
         Find files where the filter criterion is True.
 
