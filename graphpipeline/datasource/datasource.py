@@ -83,7 +83,7 @@ def download_latest(datasource_class_name: str, import_path: str, root_dir: str,
     datasource_class = getattr(module, datasource_class_name)
 
     ds = datasource_class(root_dir)
-    ds.__download(ds.latest_remote_version(), **download_arguments)
+    ds.download(ds.latest_remote_version(), **download_arguments)
     
     return ds.ds_dir
 
@@ -92,13 +92,13 @@ def download_latest_if_not_exists(datasource_class_name: str, import_path: str, 
     # set empty download_arguments dictionary if not passed
     if not download_arguments:
         download_arguments = {}
-    print(datasource_class_name, import_path, root_dir, download_arguments)
+
     module = importlib.import_module(import_path)
     datasource_class = getattr(module, datasource_class_name)
     ds = datasource_class(root_dir)
 
     if not ds.latest_local_instance(**download_arguments):
-        ds.__download(ds.latest_remote_version(), **download_arguments)
+        ds.download(ds.latest_remote_version(), **download_arguments)
 
     else:
         log.info(f'Found local instance at {ds.latest_local_instance(**download_arguments).instance_dir}')
@@ -108,7 +108,7 @@ def download_latest_if_not_exists(datasource_class_name: str, import_path: str, 
 
 def setify_dict(d: dict) -> dict:
     """
-    In order to compare __download arguments read from JSON we have to load lists into sets.
+    In order to compare download arguments read from JSON we have to load lists into sets.
 
     So that:
         {taxids: ['10090', '9606']} == {taxids: ['9606', '10090'[}
@@ -188,7 +188,7 @@ class BaseDataSource():
             download_arguments = {}
         latest = None
 
-        # only return instances where the __download arguments match (default, argument_check = True)
+        # only return instances where the download arguments match (default, argument_check = True)
         if argument_check:
             for instance in self.list_remote_instances(url):
                 if setify_dict(instance.download_arguments) == setify_dict(download_arguments):
@@ -197,7 +197,7 @@ class BaseDataSource():
                     else:
                         if instance.instance_created > latest.instance_created:
                             latest = instance
-        # return all latest instances, don't check for __download arguments (argument_check = False)
+        # return all latest instances, don't check for download arguments (argument_check = False)
         else:
             for instance in self.list_remote_instances(url):
                 if not latest:
@@ -247,7 +247,7 @@ class BaseDataSource():
             download_arguments = {}
         latest = None
 
-        # only return instances where the __download arguments match (default, argument_check = True)
+        # only return instances where the download arguments match (default, argument_check = True)
         if argument_check:
             for instance in self.instances_local:
                 if setify_dict(instance.download_arguments) == setify_dict(download_arguments):
@@ -256,7 +256,7 @@ class BaseDataSource():
                     else:
                         if instance.instance_created > latest.instance_created:
                             latest = instance
-        # return all latest instances, don't check for __download arguments (argument_check = False)
+        # return all latest instances, don't check for download arguments (argument_check = False)
         else:
             for instance in self.instances_local:
                 if not latest:
@@ -365,7 +365,7 @@ class RollingReleaseRemoteDataSource(RemoteDataSource):
         try:
             instance.prepare_download()
 
-            # run the __download function defined in the implementing class.
+            # run the download function defined in the implementing class.
             self.download_function(instance, **kwargs)
 
             instance.wrap_up()
@@ -401,7 +401,7 @@ class ManyVersionsRemoteDataSource(RemoteDataSource):
         Download a specific version.
 
         :param version: The version.
-        :param taxids: Optional list of taxonomy IDs to limit __download.
+        :param taxids: Optional list of taxonomy IDs to limit download.
         :type version: DataSourceVersion
         """
         self.pre_download()
@@ -466,7 +466,7 @@ class SingleVersionRemoteDataSource(RemoteDataSource):
             instance.prepare_download()
 
             if self.version_downloadable(version):
-                # run the __download function defined in the implementing class.
+                # run the download function defined in the implementing class.
                 self.download_function(instance, version, **kwargs)
             instance.wrap_up()
 

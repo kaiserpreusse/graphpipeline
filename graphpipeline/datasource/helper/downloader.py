@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 
 
 ##############################################################
-# __download functions
+# download functions
 ##############################################################
 
 def download_file_to_dir(remote_url, local_path, filename=None, overwrite=None):
@@ -39,14 +39,14 @@ def download_file_to_dir(remote_url, local_path, filename=None, overwrite=None):
     else:
         downloaded_file_path = os.path.join(local_path, remote_url.split('/')[-1])
 
-    # __download if overwrite is True
+    # download if overwrite is True
     if overwrite:
         if os.path.isfile(downloaded_file_path):
             os.remove(downloaded_file_path)
 
         return download_file(remote_url, downloaded_file_path)
 
-    # else __download only if file does not exist
+    # else download only if file does not exist
     else:
         if not os.path.isfile(downloaded_file_path):
             return download_file(remote_url, downloaded_file_path)
@@ -124,7 +124,7 @@ def _download_file_ftp(url, filepath, user=None, pw=None):
 
     log.debug("Parsed URL: {0}".format(ftp_url))
 
-    # try __download n times, return if successful
+    # try download n times, return if successful
     for i in range(retries):
         try:
             ftp = FTP(ftp_url.netloc)
@@ -151,7 +151,7 @@ def _download_file_ftp(url, filepath, user=None, pw=None):
 def download_directory_from_ftp(remote_url, source, target, user=None, pw=None, overwrite=None, file_blacklist=None,
                                 dir_blacklist=None, dir_whitelist=None):
     """
-    Recursively __download a directory from FTP server.
+    Recursively download a directory from FTP server.
 
     The function first excludeds everything from blacklist and then filters whitelist if it is passed.
 
@@ -201,7 +201,7 @@ def download_directory_from_ftp(remote_url, source, target, user=None, pw=None, 
             # + 1 removes the leading slash
             this_target = dirname[len(source) + 1:]
 
-            # only __download if no element of dir_blacklist is in path
+            # only download if no element of dir_blacklist is in path
             # the any() function is hard to read
             # it iterates dir_blacklist, checks if the element is in the string 'dirname'
             # if this is never True [= not any()] we go on
@@ -227,7 +227,7 @@ def download_directory_from_ftp(remote_url, source, target, user=None, pw=None, 
                                 try:
                                     ftp_host.download(remote_file, local_file)
                                 except FTPIOError:
-                                    log.debug('Cannot __download: {0}'.format(remote_file))
+                                    log.debug('Cannot download: {0}'.format(remote_file))
                             else:
                                 log.debug("File exists and 'overwrite' is {0}: {1}".format(overwrite, local_file))
                         local_files.append(local_file)
