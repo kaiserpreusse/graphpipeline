@@ -14,7 +14,7 @@ from ftputil import FTPHost
 
 from dateutil.parser import parse
 
-from graphpipeline.datasource.helper.downloader import list_ftp_dir, _read_text_file_ftp, get_links, download_directory_from_http, download_directory_from_ftp
+from graphpipeline.datasource.helper.downloader import *
 
 log = logging.getLogger(__name__)
 
@@ -274,16 +274,13 @@ class BaseDataSource():
         :param overwrite: If True, overwrite if target exists. Default is False.
         """
         log.debug(f"Push all instances of {self.__class__.__name__} to {url}.")
-
-        datasource_url = posixpath.join(url, self.name)
-
-        parsed_url = urlparse(datasource_url)
         if protocol == RemoteProtocols.FTP.value:
-            with FTPHost(parsed_url.netloc, user, password) as ftp:
-                pass
+            datasource_url = posixpath.join(url, self.name)
+            parsed_url = urlparse(datasource_url)
 
-
-
+            for instance in self.instances_local:
+                upload_directory_to_ftp(parsed_url.netloc, parsed_url.path, instance.instance_dir,
+                                        user=user, password=password)
 
     def clear_datasource_directory(self):
         """
