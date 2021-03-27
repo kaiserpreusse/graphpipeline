@@ -1,75 +1,84 @@
-import json
 import os
 import logging
 import shutil
 from datetime import datetime
 from uuid import uuid4
-from pathlib import Path
 from urllib.parse import urlparse, urljoin
-from bs4 import BeautifulSoup
 import requests
+from requests.auth import HTTPBasicAuth
 import importlib
 import json
+from enum import Enum
+import posixpath
 
 from dateutil.parser import parse
 
-from graphpipeline.datasource.helper.downloader import list_ftp_dir
+from graphpipeline.datasource.helper.downloader import list_ftp_dir, _read_text_file_ftp, get_links, download_directory_from_http, download_directory_from_ftp
 
 log = logging.getLogger(__name__)
 
 
-def get_links(content):
-    soup = BeautifulSoup(content)
-    for a in soup.findAll('a'):
-        yield a.get('href')
+class RemoteProtocols(Enum):
+    FTP = 'ftp'
+    WEBDAV = 'webdav'
+    HTTP = 'http'
+    HTTPS = 'https'
 
 
-def _download(url, target):
-    """
-    Download all files from a http directory to a local directory recursively.
-
-    Note that the first call *has to end with /* otherwise a file with the name of the root dir will be
-    created instead of the directories.
-    """
-    log.debug(f"Download all files from {url} to {target}")
-
-    r = requests.get(url)
-    if r.status_code != 200:
-        raise Exception('status code is {} for {}'.format(r.status_code, url))
-    content = r.text
-    if url.endswith('/'):
-        Path(target).mkdir(parents=True, exist_ok=True)
-        for link in get_links(content):
-            if not link.startswith('.'): # skip hidden files such as .DS_Store
-                _download(urljoin(url, link), os.path.join(target, link))
-    else:
-        with open(target, 'w') as f:
-            f.write(content)
-
-def list_remote_instances(url):
+def _http_list_remote_instances(url, root_dir, user=None, password=None):
     log.debug(f"List remote instances for {url}")
+    log.debug(f"Auth: {user}, {password}")
     remote_instances = []
 
-    r = requests.get(url)
+    if user and password:
+        r = requests.get(url, auth=HTTPBasicAuth(user, password))
+    else:
+        r = requests.get(url)
     if r.status_code != 200:
         raise Exception('status code is {} for {}'.format(r.status_code, url))
     content = r.text
 
     for link in get_links(content):
-        if not link.startswith('.'):  # skip hidden files such as .DS_Store
+        if not link.startswith('.') and not link.startswith('error_'):  # skip hidden files such as .DS_Store
             log.debug(f"Link found: {link}")
             instance_url = urljoin(url, link)
             json_url = urljoin(instance_url, 'metadata.json')
             log.debug(f"JSON URL {json_url}")
 
-            instance_json = requests.get(json_url)
+            if user and password:
+                instance_json = requests.get(json_url, auth=HTTPBasicAuth(user, password))
+            else:
+                instance_json = requests.get(json_url)
 
             if instance_json.status_code != 200:
                 raise Exception('status code is {} for {}'.format(r.status_code, url))
             content = instance_json.text
 
             remote_instances.append(
-                DataSourceInstance.from_dict(json.loads(content))
+                DataSourceInstance.from_dict(json.loads(content), root_dir)
+            )
+
+    return remote_instances
+
+
+def _ftp_list_remote_instances(url, root_dir, user=None, password=None):
+    log.debug(f"Get remote instances from {url}")
+    parsed_url = urlparse(url)
+    list_of_items = list_ftp_dir(parsed_url.netloc, parsed_url.path, user=user, password=password)
+
+    remote_instances = []
+
+    for item in list_of_items:
+
+        if item.permissions.startswith('d') and not item.name.startswith('error_'):
+            json_path = posixpath.join(parsed_url.path, item.name, 'metadata.json')
+            json_url = urljoin(f'ftp://{parsed_url.netloc}', json_path)
+            log.debug(f'Retrieve instance from {json_url}')
+            json_file_like = _read_text_file_ftp(json_url, user=user, password=password)
+
+            json_dict = json.loads(json_file_like.getvalue())
+            remote_instances.append(
+                DataSourceInstance.from_dict(json_dict, root_dir)
             )
 
     return remote_instances
@@ -127,28 +136,32 @@ def setify_dict(d: dict) -> dict:
 
 class BaseDataSource():
 
-    def __init__(self, root_dir):
+    def __init__(self, root_dir, name=None):
         self.root_dir = root_dir
 
-        self.name = self.__class__.__name__
+        if name:
+            self.name = name
+        else:
+            self.name = self.__class__.__name__
 
         # set the data source directory (using class name)
-        self._ds_dir = os.path.join(self.root_dir, self.__class__.__name__)
-        if not os.path.exists(self.ds_dir):
-            os.mkdir(self.ds_dir)
+        self._ds_dir = os.path.join(self.root_dir, self.name)
+
+        try:
+            if not os.path.exists(self.ds_dir):
+                os.mkdir(self.ds_dir)
+        except FileNotFoundError:
+            log.error(f"Datasource class tried to create {self.ds_dir} but failed.")
 
     def to_dict(self):
         return dict(
-            root_dir=self.root_dir,
-            name=self.name,
-            ds_dir=self.ds_dir
+            name=self.name
         )
 
     @classmethod
-    def from_dict(cls, d):
-        ds = cls(d['root_dir'])
-        ds.ds_dir = d['ds_dir']
-        ds.name = d['name']
+    def from_dict(cls, d, root_dir):
+        ds = cls(root_dir, name=d['name'])
+
         return ds
 
     @property
@@ -171,14 +184,23 @@ class BaseDataSource():
             if 'error_' not in instance and 'process_' not in instance and not instance.startswith('.'):
                 yield self.get_instance_by_uuid(instance)
 
-    def list_remote_instances(self, url):
-        if not url.endswith('/'):
-            url = url+'/'
-        datasource_url = url+self.name+'/'
+    def list_remote_instances(self, url, protocol, user: str = None, password: str = None):
+        log.debug(f"List remote instances on {protocol} ressource at {url}.")
+        if protocol == RemoteProtocols.HTTP.value:
+            if not url.endswith('/'):
+                url = url+'/'
+            datasource_url = url+self.name+'/'
 
-        return list_remote_instances(datasource_url)
+            return _http_list_remote_instances(datasource_url, self.root_dir, user=user, password=password)
 
-    def latest_remote_instance(self, url, argument_check: bool = True, **download_arguments):
+        elif protocol == RemoteProtocols.FTP.value:
+            if not url.endswith('/'):
+                url = url+'/'
+            datasource_url = url+self.name+'/'
+
+            return _ftp_list_remote_instances(datasource_url, self.root_dir, user=user, password=password)
+
+    def latest_remote_instance(self, url, protocol, user: str = None, password: str = None, argument_check: bool = True, **download_arguments):
         """
         Get local instance with latest 'instance_created' property.
 
@@ -190,7 +212,8 @@ class BaseDataSource():
 
         # only return instances where the download arguments match (default, argument_check = True)
         if argument_check:
-            for instance in self.list_remote_instances(url):
+            for instance in self.list_remote_instances(url, protocol, user, password):
+
                 if setify_dict(instance.download_arguments) == setify_dict(download_arguments):
                     if not latest:
                         latest = instance
@@ -199,7 +222,7 @@ class BaseDataSource():
                             latest = instance
         # return all latest instances, don't check for download arguments (argument_check = False)
         else:
-            for instance in self.list_remote_instances(url):
+            for instance in self.list_remote_instances(url, protocol, user, password):
                 if not latest:
                     latest = instance
                 else:
@@ -208,18 +231,21 @@ class BaseDataSource():
 
         return latest
 
-    def pull_latest_from_remote(self, url, argument_check: bool = True, **download_arguments):
+    def pull_latest_from_remote(self, url, protocol, user=None, password=None, argument_check: bool = True, **download_arguments):
         log.debug(f"Pull latest remote version of {self.name} from {url}")
-        latest_remote_instance = self.latest_remote_instance(url, argument_check, **download_arguments)
+        latest_remote_instance = self.latest_remote_instance(url, protocol, user=user, password=password, argument_check=argument_check, **download_arguments)
 
         if latest_remote_instance:
-            datasource_url = urljoin(url, self.name)
+            datasource_url = posixpath.join(url, self.name)
             log.debug(f"Datasource URL {datasource_url}")
-            latest_remote_instance_url = f"{datasource_url}/{latest_remote_instance.uuid}"
+            latest_remote_instance_url = posixpath.join(datasource_url, latest_remote_instance.uuid)
             log.debug(f"Instance URL: {latest_remote_instance_url}")
 
-            _download(f"{latest_remote_instance_url}/", os.path.join(self.ds_dir, latest_remote_instance.uuid))
-
+            if protocol == RemoteProtocols.FTP.value:
+                parsed_url = urlparse(latest_remote_instance_url)
+                download_directory_from_ftp(parsed_url.netloc, parsed_url.path, os.path.join(self.ds_dir, latest_remote_instance.uuid), user=user, password=password)
+            elif protocol == RemoteProtocols.HTTP.value:
+                download_directory_from_http(latest_remote_instance_url, os.path.join(self.ds_dir, latest_remote_instance.uuid))
 
     def clear_datasource_directory(self):
         """
@@ -499,6 +525,8 @@ class DataSourceInstance():
         else:
             self.download_arguments = {}
 
+        self.version = None
+
         # property for time of instantiation
         self.instance_created = datetime.now()
 
@@ -511,22 +539,38 @@ class DataSourceInstance():
 
         :return: Serialized dictionary
         """
-        return dict(
+        d = dict(
             datasource=self.datasource.to_dict(),
             download_arguments=self.download_arguments,
             uuid=self.uuid,
-            instance_created=self.instance_created
+            instance_created=self.instance_created,
+            version=self.version
         )
 
+        return d
+
     @classmethod
-    def from_dict(cls, d: dict) -> 'DataSourceInstance':
-        datasourceinstance = cls(BaseDataSource.from_dict(d['datasource']), download_arguments=d['download_arguments'], uuid=d['uuid'])
+    def from_dict(cls, d: dict, root_dir) -> 'DataSourceInstance':
+        """
+        Create a DataSourceInstance from dict. The standard metadata.json file
+        contains file paths for the underlying datasource. This can be overwritten
+        for remote contexts.
+
+        :param d:
+        :param root_dir:
+        :return:
+        """
+        datasource = BaseDataSource(root_dir, name=d['datasource']['name'])
+
+        datasourceinstance = cls(datasource, download_arguments=d['download_arguments'], uuid=d['uuid'])
         datasourceinstance.instance_created = d['instance_created']
+        datasourceinstance.version = d['version']
 
         return datasourceinstance
 
     @classmethod
     def read(cls, datasource, path):
+
         if os.path.exists(path):
             # read metadata
             with open(os.path.join(path, 'metadata.json'), 'r') as f:
@@ -551,7 +595,8 @@ class DataSourceInstance():
             datasourceinstance = cls(datasource, uuid=formatted_properties['uuid'])
 
             for k, v in formatted_properties.items():
-                if '_dir' not in k:
+                # don't overwrite directories or the datasource
+                if '_dir' not in k and 'datasource' not in k:
                     setattr(datasourceinstance, k, v)
 
             return datasourceinstance

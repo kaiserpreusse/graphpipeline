@@ -58,7 +58,7 @@ class GffReader(object):
         f.close()
 
     @staticmethod
-    def read_gff_attributes(attribute_column):
+    def read_gff_attributes(attribute_column) -> dict:
         """
         Parse attributes for a GFF3 record. Attributes with pre-defined meaning are parsed according to their
         specification (e.g. Dbxref usually has multiple values which are split up: 'GeneID:1234,Genbank:NM_9283').
@@ -69,23 +69,26 @@ class GffReader(object):
         :rtype: dict
         """
         attributes = {}
-        for a in attribute_column.split(';'):
+        for a in attribute_column.strip().split(';'):
             # there is a leading space for some fields
             a = a.strip()
             # an attribute looks like 'Alias=MIMAT0027693'
-            key = a.split('=')[0]
-            value = a.split('=')[1]
+            # some files contain additional whitespaces or empty elements
+            # only continue if a has content
+            if a:
+                key = a.split('=')[0]
+                value = a.split('=')[1]
 
-            # handle pre-defined attributes
-            if key == 'Dbxref':
-                # a dbxref line looks like: GeneID:1234,Genbank:NM_9283
-                dbxref_dict = {}
-                for dbxref_entry in value.split(','):
-                    dbxref_key, dbxref_value = dbxref_entry.split(':', 1)
-                    dbxref_dict[dbxref_key] = dbxref_value
-                value = dbxref_dict
+                # handle pre-defined attributes
+                if key == 'Dbxref':
+                    # a dbxref line looks like: GeneID:1234,Genbank:NM_9283
+                    dbxref_dict = {}
+                    for dbxref_entry in value.split(','):
+                        dbxref_key, dbxref_value = dbxref_entry.split(':', 1)
+                        dbxref_dict[dbxref_key] = dbxref_value
+                    value = dbxref_dict
 
-            attributes[key] = value
+                attributes[key] = value
 
         return attributes
 

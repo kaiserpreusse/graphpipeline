@@ -4,9 +4,11 @@ import os
 import io
 from collections import namedtuple
 from ftplib import FTP
-from urllib.parse import urlparse
-from urllib.request import urlretrieve
+from urllib.parse import urlparse, urljoin
+from pathlib import Path
+from requests.auth import HTTPBasicAuth
 
+from bs4 import BeautifulSoup
 from ftputil import FTPHost
 import ftputil
 import requests
@@ -105,6 +107,48 @@ def _download_file_http(u, path):
         raise ValueError("URL can't be retrieved. Status code: {0}. URL: {1}".format(r.status_code, u))
 
 
+def _read_text_file_ftp(url, user=None, password=None) -> io.StringIO:
+    """
+    Read content of a single file from an FTP server. This returns a io.StringIO
+    instance. Use only for uncompressed text files,
+    does not return meaningful output for gzipped files or other binary files.
+    """
+    retries = 3
+
+    # add 'ftp://' to form a parsable URL in case a path is passed
+    if not url.startswith("ftp://"):
+        url = 'ftp://' + url
+
+    log.debug('Read FTP file {}'.format(url))
+
+    ftp_url = urlparse(url)
+
+    log.debug("Parsed URL: {0}".format(ftp_url))
+
+    # try download n times, return if successful
+    for i in range(retries):
+        try:
+            ftp = FTP(ftp_url.netloc)
+
+            if user:
+                ftp.login(user=user, passwd=password)
+            else:
+                ftp.login()
+            log.debug(f'execute RETR on {ftp_url.path}')
+
+            output = io.StringIO()
+
+            ftp.retrlines("RETR {0}".format(ftp_url.path), output.write)
+            ftp.close()
+            return output
+
+        except EOFError as e:
+            log.error(f"Download of {ftp_url.path} not successful on try {i+1}, try again.")
+            log.error(e)
+
+    raise ValueError(f"File {ftp_url.path} not available")
+
+
 def _download_file_ftp(url, filepath, user=None, pw=None):
     """
     Read content of a single file from an FTP server.
@@ -148,7 +192,30 @@ def _download_file_ftp(url, filepath, user=None, pw=None):
     raise ValueError(f"File {ftp_url.path} not available")
 
 
-def download_directory_from_ftp(remote_url, source, target, user=None, pw=None, overwrite=None, file_blacklist=None,
+def download_directory_from_http(url, target, user=None, password=None):
+    """
+    Download all files from a http directory to a local directory recursively.
+
+    Note that the first call *has to end with /* otherwise a file with the name of the root dir will be
+    created instead of the directories.
+    """
+    log.debug(f"Download all files from {url} to {target}")
+
+    r = requests.get(url)
+    if r.status_code != 200:
+        raise Exception('status code is {} for {}'.format(r.status_code, url))
+    content = r.text
+    if url.endswith('/'):
+        Path(target).mkdir(parents=True, exist_ok=True)
+        for link in get_links(content):
+            if not link.startswith('.'): # skip hidden files such as .DS_Store
+                download_directory_from_http(urljoin(url, link), os.path.join(target, link), user, password)
+    else:
+        with open(target, 'w') as f:
+            f.write(content)
+
+
+def download_directory_from_ftp(remote_url, source, target, user=None, password=None, overwrite=None, file_blacklist=None,
                                 dir_blacklist=None, dir_whitelist=None):
     """
     Recursively download a directory from FTP server.
@@ -178,6 +245,9 @@ def download_directory_from_ftp(remote_url, source, target, user=None, pw=None, 
     log.debug("Dir Blacklist: {}".format(dir_blacklist))
     log.debug("Dir Whitelist: {}".format(dir_whitelist))
 
+    if not remote_url.startswith('ftp://'):
+        remote_url = f'ftp://{remote_url}'
+
     ftp_url = urlparse(remote_url)
 
     log.debug("FTP URL parsed: {}".format(ftp_url))
@@ -190,12 +260,12 @@ def download_directory_from_ftp(remote_url, source, target, user=None, pw=None, 
 
     local_files = []
 
-    with ftputil.FTPHost(ftp_url.netloc, user, pw) as ftp_host:
+    with ftputil.FTPHost(ftp_url.netloc, user, password) as ftp_host:
         log.debug("FTP connnected: {0}".format(str(ftp_host)))
         source = source.rstrip('/')
         target = target.rstrip('/')
         for (dirname, subdirs, files) in ftp_host.walk(source):
-            print(dirname, subdirs, files)
+            log.debug(f'{dirname}, {subdirs}, {files}')
 
             # get name of this dir without source
             # + 1 removes the leading slash
@@ -280,7 +350,7 @@ def get_single_file_ftp(url, user=None, pw=None):
 ##############################################################
 
 
-def list_ftp_dir(url, path=None):
+def list_ftp_dir(url, path=None, user=None, password=None):
     """
     List a FTP directory.
 
@@ -290,7 +360,7 @@ def list_ftp_dir(url, path=None):
     :param path: Optional path on FTP Server for CWD.
     :return: Directory list.
     """
-    filelist = raw_list_ftp_dir(url, path=path)
+    filelist = raw_list_ftp_dir(url, path=path, user=user, password=password)
     return [_parse_ftp_list_item(x) for x in filelist]
 
 
@@ -320,7 +390,7 @@ def list_files_only_ftp_dir(url, path=None):
     return output
 
 
-def raw_list_ftp_dir(url, path=None):
+def raw_list_ftp_dir(url, path=None, user=None, password=None):
     """
     Get the raw output of FTP LIST on an FTP path.
 
@@ -335,7 +405,11 @@ def raw_list_ftp_dir(url, path=None):
 
     ftp_url = urlparse(url)
     ftp = FTP(ftp_url.netloc)
-    ftp.login()
+
+    if user and password:
+        ftp.login(user=user, passwd=password)
+    else:
+        ftp.login()
 
     # move into path of url
     if ftp_url.path:
@@ -514,3 +588,9 @@ def get_latest_date_http_file(url):
         return parser.parse(response.headers.get("Last-Modified", str(datetime.date.today()))).date()
     else:
         raise FileNotFoundError("Failed with the http status code {}".format(response.status_code))
+
+
+def get_links(content):
+    soup = BeautifulSoup(content)
+    for a in soup.findAll('a'):
+        yield a.get('href')
