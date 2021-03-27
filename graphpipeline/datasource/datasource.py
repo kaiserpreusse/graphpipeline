@@ -165,6 +165,19 @@ class BaseDataSource():
 
         return ds
 
+    @classmethod
+    def from_dir(cls, root_dir):
+        """
+        Create DataSource instances from a root_dir. Skip common files.
+        """
+        output = []
+        for name in os.listdir(root_dir):
+            if not name.startswith('.'):
+                output.append(
+                    BaseDataSource(root_dir, name)
+                )
+        return output
+
     @property
     def ds_dir(self):
         return self._ds_dir
