@@ -20,7 +20,7 @@ def test_datasource_serialization(tmp_path):
 
     ds_dict = ds.to_dict()
 
-    reloaded_datasource = BaseDataSource.from_dict(ds_dict)
+    reloaded_datasource = BaseDataSource.from_dict(ds_dict, root_dir=tmp_path)
 
     assert reloaded_datasource.to_dict() == ds_dict
 

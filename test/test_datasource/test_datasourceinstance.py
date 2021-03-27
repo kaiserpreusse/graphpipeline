@@ -16,7 +16,7 @@ def test_datasourceinstance_serialization(tmp_path):
 
     dsi_dict = datasource_instance.to_dict()
 
-    reloaded_datasource_instance = DataSourceInstance.from_dict(dsi_dict)
+    reloaded_datasource_instance = DataSourceInstance.from_dict(dsi_dict, root_dir=tmp_path)
 
     assert reloaded_datasource_instance.to_dict() == dsi_dict
 
