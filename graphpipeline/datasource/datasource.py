@@ -10,6 +10,7 @@ import importlib
 import json
 from enum import Enum
 import posixpath
+from ftputil import FTPHost
 
 from dateutil.parser import parse
 
@@ -246,6 +247,30 @@ class BaseDataSource():
                 download_directory_from_ftp(parsed_url.netloc, parsed_url.path, os.path.join(self.ds_dir, latest_remote_instance.uuid), user=user, password=password)
             elif protocol == RemoteProtocols.HTTP.value:
                 download_directory_from_http(latest_remote_instance_url, os.path.join(self.ds_dir, latest_remote_instance.uuid))
+
+    def push_to_remote(self, url, protocol, user=None, password=None, overwrite=False):
+        """
+        Push all instances of this datasource to a remote server.
+
+        Currently only supports FTP.
+
+        :param url: The target URL
+        :param protocol: Protocol (currently only FTP)
+        :param user: Username
+        :param password: Password
+        :param overwrite: If True, overwrite if target exists. Default is False.
+        """
+        log.debug(f"Push all instances of {self.__class__.__name__} to {url}.")
+
+        datasource_url = posixpath.join(url, self.name)
+
+        parsed_url = urlparse(datasource_url)
+        if protocol == RemoteProtocols.FTP.value:
+            with FTPHost(parsed_url.netloc, user, password) as ftp:
+                pass
+
+
+
 
     def clear_datasource_directory(self):
         """

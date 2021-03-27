@@ -15,6 +15,7 @@ import requests
 from dateutil import parser
 from ftputil.error import FTPIOError
 
+
 log = logging.getLogger(__name__)
 
 
@@ -307,6 +308,33 @@ def download_directory_from_ftp(remote_url, source, target, user=None, password=
                 log.debug("Skip {}".format(this_target))
 
     return local_files
+
+
+def upload_directory_to_ftp(ftp_host_url, target, source, user=None, password=None):
+    log.debug(f'Upload {source} to {target} on {ftp_host_url}.')
+    log.debug(f'User: {user}, password: {password}.')
+
+    if ftp_host_url.startswith('ftp://'):
+        parse_url = urlparse(ftp_host_url)
+        ftp_host_url = parse_url.netloc
+
+    with ftputil.FTPHost(ftp_host_url, user, password) as ftp_host:
+
+        # get parent to extract relative paths at target from
+        # dirnames in os.walk()
+        parent = os.path.dirname(os.path.normpath(source))
+
+        for dir_name, _, dir_files in os.walk(source):
+            rel_target_path = os.path.relpath(dir_name, parent)
+            remote = ftp_host.path.join(target, rel_target_path)
+
+            if not ftp_host.path.exists(remote):
+                ftp_host.mkdir(remote)
+
+            for f in dir_files:
+                local_f = os.path.join(dir_name, f)
+                remote_f = ftp_host.path.join(remote, f)
+                ftp_host.upload(local_f, remote_f)
 
 
 def get_single_file_ftp(url, user=None, pw=None):
