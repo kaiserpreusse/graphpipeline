@@ -329,7 +329,7 @@ def upload_directory_to_ftp(ftp_host_url, target, source, user=None, password=No
             remote = ftp_host.path.join(target, rel_target_path)
 
             if not ftp_host.path.exists(remote):
-                ftp_host.mkdir(remote)
+                ftp_host.makedirs(remote, exist_ok=True)
 
             for f in dir_files:
                 local_f = os.path.join(dir_name, f)
