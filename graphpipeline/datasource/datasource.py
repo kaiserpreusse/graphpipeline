@@ -14,7 +14,8 @@ from ftputil import FTPHost
 
 from dateutil.parser import parse
 
-from graphpipeline.datasource.helper.downloader import *
+from graphpipeline.datasource.helper.downloader import _read_text_file_ftp, download_directory_from_http, \
+    download_directory_from_ftp, upload_directory_to_ftp, list_ftp_dir, get_links
 
 log = logging.getLogger(__name__)
 
