@@ -10,7 +10,6 @@ import importlib
 import json
 from enum import Enum
 import posixpath
-from ftputil import FTPHost
 
 from dateutil.parser import parse
 
