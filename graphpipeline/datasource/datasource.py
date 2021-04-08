@@ -599,7 +599,11 @@ class DataSourceInstance():
 
         datasourceinstance = cls(datasource, download_arguments=d['download_arguments'], uuid=d['uuid'])
         datasourceinstance.instance_created = d['instance_created']
-        datasourceinstance.version = d['version']
+        try:
+            datasourceinstance.version = d['version']
+        except KeyError:
+            # datasource without version
+            pass
 
         return datasourceinstance
 
