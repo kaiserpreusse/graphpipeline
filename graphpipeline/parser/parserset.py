@@ -1,8 +1,11 @@
 from py2neo import Graph
 from multiprocessing import Pool
+import logging
 
 from graphpipeline.parser import Parser
 from graphpipeline.parser.parser import run_parser_merge_nodes
+
+log = logging.getLogger(__name__)
 
 
 class ParserSet:
@@ -106,16 +109,23 @@ class ParserSet:
 
         This function is used when memory is limited to avoid collecting too much data in memroy.
         """
+        log.debug("Run and merge sequential.")
+        log.debug("Merge NodeSets")
         for parser in self.parsers:
+            log.debug(f"Run {parser.__class__.__name__}")
             parser.run_with_mounted_arguments()
             for ns in parser.container.nodesets:
+                log.debug(f"Merge NodeSet with {ns.labels}, {ns.merge_keys}")
                 ns.merge(graph)
             parser._reset_parser()
 
         # run again to create relationships
+        log.debug("Merge RelationshipSets")
         for parser in self.parsers:
+            log.debug(f"Run {parser.__class__.__name__}")
             parser.run_with_mounted_arguments()
             for rs in parser.container.relationshipsets:
+                log.debug(f"Merge RelationshipSet {rs}")
                 rs.merge(graph)
             parser._reset_parser()
 
