@@ -9,7 +9,7 @@ from graphpipeline.datasource import DataSourceInstance
 log = logging.getLogger(__name__)
 
 
-def run_parser_merge_nodes(graph_config: tuple, parser_class_name: str, import_path: str, parser_arguments: dict, datasourceinstances: List[dict]):
+def run_parser_merge_nodes(graph_config: tuple, parser_class_name: str, import_path: str, parser_arguments: dict, datasourceinstances: List[dict], root_dir: str):
     """
     Run a parser in a Pool/RPC.
 
@@ -27,7 +27,7 @@ def run_parser_merge_nodes(graph_config: tuple, parser_class_name: str, import_p
     parser = parser_class()
     # add datasource instances
     for dsi_dict in datasourceinstances:
-        dsi = DataSourceInstance.from_dict(dsi_dict)
+        dsi = DataSourceInstance.from_dict(dsi_dict, root_dir)
         parser.datasource_instances.append(dsi)
     # add arguments
     for k, v in parser_arguments.items():
