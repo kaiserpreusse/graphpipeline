@@ -76,15 +76,18 @@ class ParserSet:
             p._reset_parser()
 
     def run_and_merge_nodes_parallel(self, graph: dict, import_path: str, pool_size=4):
+        log.debug("Run parallel")
         graph_config = (graph.service.profile, graph.name)
         pool = Pool(pool_size)
         results = []
         for parser in self.parsers:
+            log.debug(f"Append {parser.__class__.__name__} to pool")
             results.append(
                 pool.apply_async(
                     run_parser_merge_nodes, (graph_config, parser.__class__.__name__, import_path, parser.get_arguments(), [dsi.to_dict() for dsi in parser.datasource_instances])
                 )
             )
+        log.debug("Wait for pool to close and join.")
         [r.wait() for r in results]
 
         pool.close()
