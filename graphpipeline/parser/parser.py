@@ -1,8 +1,12 @@
-import logging
 import importlib
-from py2neo import Graph
-from graphio import Container, NodeSet, RelationshipSet
+import logging
+import os
+import json
 from typing import List
+from datetime import date, datetime
+
+from graphio import Container, NodeSet, RelationshipSet
+from py2neo import Graph
 
 from graphpipeline.datasource import DataSourceInstance
 
@@ -38,6 +42,36 @@ def run_parser_merge_nodes(graph_config: tuple, parser_class_name: str, import_p
     for ns in parser.container.nodesets:
         ns.create_index(graph)
         ns.merge(graph)
+
+
+def run_and_serialize(target_dir: str, parser_class_name: str, import_path: str, parser_arguments: dict, datasourceinstances: List[dict], root_dir: str):
+    """
+    Run the parser and serialize the output to a target directory.
+
+    :param target_dir:
+    :param parser_class_name:
+    :param import_path:
+    :param parser_arguments:
+    :param datasourceinstances:
+    :param root_dir:
+    :return:
+    """
+    log.debug(f"Run {parser_class_name} with {parser_arguments}")
+    module = importlib.import_module(import_path)
+    parser_class = getattr(module, parser_class_name)
+
+    parser = parser_class()
+    # add datasource instances
+    for dsi_dict in datasourceinstances:
+        dsi = DataSourceInstance.from_dict(dsi_dict, root_dir)
+        parser.datasource_instances.append(dsi)
+    # add arguments
+    for k, v in parser_arguments.items():
+        parser.__dict__[k] = v
+
+    parser.run_with_mounted_arguments()
+
+    parser.serialize(target_dir)
 
 
 class Parser:
@@ -112,6 +146,90 @@ class Parser:
         Returns the output of the parser function.
         """
         raise NotImplementedError
+
+    def _serialization_dir_name(self) -> str:
+        """
+        Create a name that identifies the Parser.
+
+            MyParser_taxid_9606
+
+        :return: Parser name.
+        """
+
+        parser_name = f"{self.__class__.__name__}"
+        if self.arguments:
+            for k, v in self.get_arguments().items():
+                parser_name += f"_{k}_{v}"
+        return parser_name
+
+    def metadata_dict(self) -> dict:
+        """
+        Create dictionary of Parser metadata, do not include the NodeSets and RelationshipSets.
+        """
+        output = dict(
+            name=self.name,
+            datasource_instances=[dsi.to_dict() for dsi in self.datasource_instances]
+        )
+        for a in self.arguments:
+            output[a] = self.__dict__[a]
+
+        return output
+
+    def serialize(self, target_dir: str):
+        """
+        Store the Parser with output in a directory.
+        """
+        # serializer for datetime
+        def json_serial(obj):
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            raise TypeError("Type %s not serializable" % type(obj))
+
+        output_dir = os.path.join(target_dir, self._serialization_dir_name())
+        if not os.path.exists(output_dir):
+            os.mkdir(output_dir)
+
+        metadate_path = os.path.join(output_dir, 'parser_data.json')
+        with open(metadate_path, 'wt') as f:
+            json.dump(self.metadata_dict(), f, default=json_serial)
+
+        for nodeset in self.container.nodesets:
+            nodeset.serialize(output_dir)
+
+        for relset in self.container.relationshipsets:
+            relset.serialize(output_dir)
+
+    @classmethod
+    def deserialize(cls, source_dir: str) -> 'Parser':
+        """
+        Read from a serialized directory, recreate a Parser that can load to the database.
+
+        :param source_dir: Directory to read from.
+        :return: A Parser object.
+        """
+        log.debug(f"Read Parser from {source_dir}.")
+        p = cls()
+
+        # TODO also read metadata
+
+        for file in os.listdir(source_dir):
+            if file.startswith('nodeset_'):
+                ns_name = file.replace('.json', '')
+                with open(os.path.join(source_dir, file), 'rt') as f:
+                    log.debug(f"Deserialize {f}")
+                    ns = NodeSet.from_dict(json.load(f))
+                    log.debug(f"Num nodes in NodeSet: {len(ns.nodes)}")
+                    p.__dict__[ns_name] = ns
+
+            elif file.startswith('relationshipset_'):
+                rs_name = file.replace('.json', '')
+                with open(os.path.join(source_dir, file), 'rt') as f:
+                    log.debug(f"Deserialize {f}")
+                    rs = RelationshipSet.from_dict(json.load(f))
+                    log.debug(f"Num relationships in RelationshipSet: {len(rs.relationships)}")
+                    p.__dict__[rs_name] = rs
+
+        return p
 
 
 class ReturnParser(Parser):

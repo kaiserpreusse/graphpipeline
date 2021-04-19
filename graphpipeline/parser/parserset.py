@@ -1,9 +1,10 @@
 from py2neo import Graph
 from multiprocessing import Pool
 import logging
+import os
 
 from graphpipeline.parser import Parser
-from graphpipeline.parser.parser import run_parser_merge_nodes
+from graphpipeline.parser.parser import run_parser_merge_nodes, run_and_serialize
 
 log = logging.getLogger(__name__)
 
@@ -41,14 +42,21 @@ class ParserSet:
         self.merge_relationships(graph)
 
     def merge_relationships(self, graph):
+        log.debug("Merge relationships")
         for p in self.parsers:
+            log.debug(f"Merge relationships for {p.__class__.__name__}")
             for relset in p.container.relationshipsets:
+                log.debug(f"Merge {str(relset)}")
                 relset.create_index(graph)
                 relset.merge(graph)
 
     def merge_nodes(self, graph):
+        log.debug("Merge nodes")
         for p in self.parsers:
+            log.debug(f"Merge nodes for {p.__class__.__name__}")
             for nodeset in p.container.nodesets:
+                log.debug(f"Merge {str(nodeset)}")
+                log.debug(f"Number of nodes: {len(nodeset.nodes)}")
                 nodeset.create_index(graph)
                 nodeset.merge(graph)
 
@@ -86,6 +94,25 @@ class ParserSet:
             results.append(
                 pool.apply_async(
                     run_parser_merge_nodes, (graph_config, parser.__class__.__name__, import_path, parser.get_arguments(), [dsi.to_dict() for dsi in parser.datasource_instances], root_dir)
+                )
+            )
+        log.debug("Wait for pool to close and join.")
+        [r.wait() for r in results]
+
+        pool.close()
+        pool.join()
+
+    def run_and_serialize_parallel(self, target_dir: str, import_path: str, root_dir: str, pool_size=4):
+        log.debug(f"Run parallel, pool size {pool_size}")
+
+        pool = Pool(pool_size)
+        results = []
+        for parser in self.parsers:
+            log.debug(f"Append {parser.__class__.__name__} to pool")
+            log.debug((target_dir, parser.__class__.__name__, import_path, parser.get_arguments(), [dsi.to_dict() for dsi in parser.datasource_instances], root_dir))
+            results.append(
+                pool.apply_async(
+                    run_and_serialize, (target_dir, parser.__class__.__name__, import_path, parser.get_arguments(), [dsi.to_dict() for dsi in parser.datasource_instances], root_dir)
                 )
             )
         log.debug("Wait for pool to close and join.")
@@ -160,3 +187,28 @@ class ParserSet:
         self._reset()
         self.run_with_mounted_arguments()
         self.create(graph)
+
+    def run_and_serialize(self, target_dir):
+        for p in self.parsers:
+            p.run_with_mounted_arguments()
+            p.serialize(target_dir)
+
+    def serialize(self, target_dir: str) -> None:
+        """
+        Serialize the entire ParserSet to a directory.
+
+        :param target_dir: The target directory (must exist on disk)
+        """
+        for p in self.parsers:
+            p.serialize(target_dir)
+
+    @classmethod
+    def deserialize(self, source_dir: str) -> 'ParserSet':
+        log.debug(f"Read ParserSet from {source_dir}")
+        ps = ParserSet()
+        parser_name_list = [x for x in os.listdir(source_dir) if not x.startswith('.')]
+        for parser_name in parser_name_list:
+            p = Parser.deserialize(os.path.join(source_dir, parser_name))
+            ps.add(p)
+
+        return ps
