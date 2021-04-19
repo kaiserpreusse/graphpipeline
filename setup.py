@@ -16,7 +16,7 @@ setup(name='graphpipeline',
       license='MIT',
       packages=find_packages(),
       install_requires=[
-          'requests', 'ftputil', 'graphio', 'python-dateutil', 'bs4', 'webdavclient3'
+          'requests', 'ftputil', 'graphio>=0.1.0', 'python-dateutil', 'bs4', 'webdavclient3'
       ],
       keywords=['data'],
       zip_safe=False,
