@@ -1,6 +1,6 @@
 py2neo>=2021.0.0
 neo4j
-graphio>0.1.0
+graphio>=0.1.0
 requests
 ftputil
 python-dateutil
