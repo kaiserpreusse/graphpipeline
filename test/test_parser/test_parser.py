@@ -25,8 +25,8 @@ class SomeParser(ReturnParser):
 
 
 @pytest.fixture
-def test_parser_with_data(TestParserClass, tmp_path):
-    p = TestParserClass(tmp_path)
+def test_parser_with_data():
+    p = SomeParser()
     p.run()
     return p
 
