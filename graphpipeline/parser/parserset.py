@@ -203,11 +203,14 @@ class ParserSet:
             p.serialize(target_dir)
 
     @classmethod
-    def deserialize(self, source_dir: str) -> 'ParserSet':
+    def deserialize(self, source_dir: str, whitelist: list = None) -> 'ParserSet':
         log.debug(f"Read ParserSet from {source_dir}")
         ps = ParserSet()
         parser_name_list = [x for x in os.listdir(source_dir) if not x.startswith('.')]
         for parser_name in parser_name_list:
+            if whitelist:
+                if parser_name not in whitelist:
+                    continue
             p = Parser.deserialize(os.path.join(source_dir, parser_name))
             ps.add(p)
 
