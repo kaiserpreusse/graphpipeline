@@ -267,3 +267,25 @@ class TestParserSetSerialize:
 
         assert len(reloaded_ps.parsers) == 1
         assert p1.__class__.__name__ in [x.name for x in reloaded_ps.parsers]
+        assert p2.__class__.__name__ not in [x.name for x in reloaded_ps.parsers]
+        assert p3.__class__.__name__ not in [x.name for x in reloaded_ps.parsers]
+
+    def test_deserialize_whitelist_multiple_parsers(self, tmp_path):
+
+        ps = ParserSet()
+        p1 = SomeTestParser()
+        p2 = RootTestParser()
+        p3 = DependingTestParser()
+
+        ps.add(p1)
+        ps.add(p2)
+        ps.add(p3)
+
+        ps.serialize(tmp_path)
+
+        reloaded_ps = ParserSet.deserialize(tmp_path, whitelist=[p1, p3])
+
+        assert len(reloaded_ps.parsers) == 2
+        assert p1.__class__.__name__ in [x.name for x in reloaded_ps.parsers]
+        assert p3.__class__.__name__ in [x.name for x in reloaded_ps.parsers]
+        assert p2.__class__.__name__ not in [x.name for x in reloaded_ps.parsers]
