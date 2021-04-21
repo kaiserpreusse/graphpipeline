@@ -52,6 +52,26 @@ class DependingTestParser(ReturnParser):
             self.rels.add_relationship({'source_id': i}, {'target_id': i}, {'source': 'test'})
 
 
+class SomeTestParserArguments(ReturnParser):
+    def __init__(self):
+        super(SomeTestParserArguments, self).__init__()
+
+        self.source = NodeSet(['Source'], merge_keys=['source_id'])
+        self.target = NodeSet(['Target'], merge_keys=['target_id'])
+        self.rels = RelationshipSet('FOO', ['Source'], ['Target'], ['source_id'], ['target_id'])
+
+        self.arguments = ['taxid']
+
+    def run_with_mounted_arguments(self):
+        self.run(self.taxid)
+
+    def run(self, taxid):
+        for i in range(100):
+            self.source.add_node({'source_id': i})
+            self.target.add_node({'target_id': i})
+            self.rels.add_relationship({'source_id': i}, {'target_id': i}, {'source': 'test'})
+
+
 @pytest.mark.neo4j
 def test_parserset_merge(clear_graph, tmp_path, graph):
     """
@@ -212,8 +232,10 @@ class TestParserSetSelection:
     def test_parserset_selection_by_parser_class_mulitple_times(self):
         # same parser class can exist in ParserSet multiple times (e.g. with different arguments)
         ps = ParserSet()
-        p1 = SomeTestParser()
-        other_p1 = SomeTestParser()
+        p1 = SomeTestParserArguments()
+        p1.taxid = '9606'
+        other_p1 = SomeTestParserArguments()
+        other_p1.taxid = '10090'
         p2 = RootTestParser()
         p3 = DependingTestParser()
 
@@ -222,7 +244,7 @@ class TestParserSetSelection:
         ps.add(p2)
         ps.add(p3)
 
-        ps.select(parser=[SomeTestParser])
+        ps.select(parser=[SomeTestParserArguments])
 
         assert len(ps.parsers) == 2
         assert len(ps._parser_stash) == 2
@@ -286,7 +308,7 @@ class TestParserSetSerialize:
 
         ps.serialize(tmp_path)
 
-        reloaded_ps = ParserSet.deserialize(tmp_path, whitelist=[p1])
+        reloaded_ps = ParserSet.deserialize(tmp_path, whitelist=[SomeTestParser])
 
         assert len(reloaded_ps.parsers) == 1
         assert p1.__class__.__name__ in [x.name for x in reloaded_ps.parsers]
@@ -296,21 +318,25 @@ class TestParserSetSerialize:
     def test_deserialize_whitelist_same_parser_multiple_times(self, tmp_path):
         # same parser class can exist in ParserSet multiple times (e.g. with different arguments)
         ps = ParserSet()
-        p1 = SomeTestParser()
+        p1 = SomeTestParserArguments()
+        p1.taxid = '9606'
+        other_p1 = SomeTestParserArguments()
+        other_p1.taxid = '10090'
         p2 = RootTestParser()
         p3 = DependingTestParser()
 
         ps.add(p1)
-        ps.add(p1)
+        ps.add(other_p1)
         ps.add(p2)
         ps.add(p3)
 
         ps.serialize(tmp_path)
 
-        reloaded_ps = ParserSet.deserialize(tmp_path, whitelist=[p1])
+        reloaded_ps = ParserSet.deserialize(tmp_path, whitelist=[SomeTestParserArguments])
 
         assert len(reloaded_ps.parsers) == 2
         assert p1.__class__.__name__ in [x.name for x in reloaded_ps.parsers]
+        assert other_p1.__class__.__name__ in [x.name for x in reloaded_ps.parsers]
         assert p2.__class__.__name__ not in [x.name for x in reloaded_ps.parsers]
         assert p3.__class__.__name__ not in [x.name for x in reloaded_ps.parsers]
 
@@ -327,7 +353,7 @@ class TestParserSetSerialize:
 
         ps.serialize(tmp_path)
 
-        reloaded_ps = ParserSet.deserialize(tmp_path, whitelist=[p1, p3])
+        reloaded_ps = ParserSet.deserialize(tmp_path, whitelist=[SomeTestParser, DependingTestParser])
 
         assert len(reloaded_ps.parsers) == 2
         assert p1.__class__.__name__ in [x.name for x in reloaded_ps.parsers]

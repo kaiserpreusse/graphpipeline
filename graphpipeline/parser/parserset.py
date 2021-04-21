@@ -239,16 +239,24 @@ class ParserSet:
         log.debug(f"Read ParserSet from {source_dir}")
         ps = ParserSet()
         parser_name_list = [x for x in os.listdir(source_dir) if not x.startswith('.')]
+
         selected_parser_name_list = set()
+
+        # select the parser for whitelist
         for parser_name in parser_name_list:
+            p_with_metadata = Parser.deserialize(os.path.join(source_dir, parser_name), metadata_only=True)
             if whitelist:
                 for whitelisted_parser in whitelist:
+
                     if isinstance(whitelisted_parser, str):
-                        if parser_name == whitelisted_parser:
+                        if p_with_metadata.name == whitelisted_parser:
                             selected_parser_name_list.add(parser_name)
                     elif isinstance(whitelisted_parser, type):
-                        if whitelisted_parser.__name__ == parser_name:
+
+                        if whitelisted_parser.__name__ == p_with_metadata.name:
                             selected_parser_name_list.add(parser_name)
+            else:
+                selected_parser_name_list.add(parser_name)
 
         for selected_parser in selected_parser_name_list:
             p = Parser.deserialize(os.path.join(source_dir, selected_parser))

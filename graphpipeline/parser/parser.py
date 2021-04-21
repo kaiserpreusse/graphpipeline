@@ -200,7 +200,7 @@ class Parser:
             relset.serialize(output_dir)
 
     @classmethod
-    def deserialize(cls, source_dir: str) -> 'Parser':
+    def deserialize(cls, source_dir: str, metadata_only: bool = False) -> 'Parser':
         """
         Read from a serialized directory, recreate a Parser that can load to the database.
 
@@ -211,23 +211,24 @@ class Parser:
         p = cls()
 
         for file in os.listdir(source_dir):
-            if file.startswith('nodeset_'):
-                ns_name = file.replace('.json', '')
-                with open(os.path.join(source_dir, file), 'rt') as f:
-                    log.debug(f"Deserialize {f}")
-                    ns = NodeSet.from_dict(json.load(f))
-                    log.debug(f"Num nodes in NodeSet: {len(ns.nodes)}")
-                    p.__dict__[ns_name] = ns
+            if not metadata_only:
+                if file.startswith('nodeset_'):
+                    ns_name = file.replace('.json', '')
+                    with open(os.path.join(source_dir, file), 'rt') as f:
+                        log.debug(f"Deserialize {f}")
+                        ns = NodeSet.from_dict(json.load(f))
+                        log.debug(f"Num nodes in NodeSet: {len(ns.nodes)}")
+                        p.__dict__[ns_name] = ns
 
-            elif file.startswith('relationshipset_'):
-                rs_name = file.replace('.json', '')
-                with open(os.path.join(source_dir, file), 'rt') as f:
-                    log.debug(f"Deserialize {f}")
-                    rs = RelationshipSet.from_dict(json.load(f))
-                    log.debug(f"Num relationships in RelationshipSet: {len(rs.relationships)}")
-                    p.__dict__[rs_name] = rs
+                elif file.startswith('relationshipset_'):
+                    rs_name = file.replace('.json', '')
+                    with open(os.path.join(source_dir, file), 'rt') as f:
+                        log.debug(f"Deserialize {f}")
+                        rs = RelationshipSet.from_dict(json.load(f))
+                        log.debug(f"Num relationships in RelationshipSet: {len(rs.relationships)}")
+                        p.__dict__[rs_name] = rs
 
-            elif file == 'parser_data.json':
+            if file == 'parser_data.json':
                 with open(os.path.join(source_dir, file), 'rt') as f:
                     metadata = json.load(f)
                     # TODO add datasource instances to deserializer
