@@ -235,7 +235,7 @@ class ParserSet:
             p.serialize(target_dir)
 
     @classmethod
-    def deserialize(self, source_dir: str, whitelist: List[Union[str, Parser]] = None) -> 'ParserSet':
+    def deserialize(self, source_dir: str, whitelist: List[Union[str, type]] = None) -> 'ParserSet':
         log.debug(f"Read ParserSet from {source_dir}")
         ps = ParserSet()
         parser_name_list = [x for x in os.listdir(source_dir) if not x.startswith('.')]
@@ -246,8 +246,8 @@ class ParserSet:
                     if isinstance(whitelisted_parser, str):
                         if parser_name == whitelisted_parser:
                             selected_parser_name_list.add(parser_name)
-                    elif isinstance(whitelisted_parser, Parser):
-                        if whitelisted_parser.__class__.__name__ == parser_name:
+                    elif isinstance(whitelisted_parser, type):
+                        if whitelisted_parser.__name__ == parser_name:
                             selected_parser_name_list.add(parser_name)
 
         for selected_parser in selected_parser_name_list:
