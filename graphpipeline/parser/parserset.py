@@ -30,7 +30,7 @@ class ParserSet:
         """
         self.parsers.append(parser)
 
-    def select(self, parser: List[Union[str, Parser]] = None):
+    def select(self, parser: List[Union[str, type]] = None):
         """
         Select a list of parsers by either name or parser instance, stash the others.
 
@@ -39,13 +39,18 @@ class ParserSet:
         # select the parser that are passed
         active_parsers = []
         for selection in parser:
+            print(f"check {selection}")
             if isinstance(selection, str):
                 for p in self.parsers:
                     if p.__class__.__name__ == selection:
                         active_parsers.append(p)
-            elif isinstance(selection, Parser):
-                for p in parser:
-                    if p.__class__ == selection.__class__:
+            elif isinstance(selection, type):
+                print('check class')
+                for p in self.parsers:
+                    print(p)
+                    print(selection)
+                    if isinstance(p, selection):
+                        print('match found')
                         active_parsers.append(p)
         # stash the others
         for p in self.parsers:

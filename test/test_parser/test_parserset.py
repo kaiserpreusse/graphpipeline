@@ -190,7 +190,7 @@ def test_dependency_parserset_merge(clear_graph, graph):
 
 
 class TestParserSetSelection:
-    def test_parserset_selection_by_parser_instance(self):
+    def test_parserset_selection_by_parser_class(self):
         ps = ParserSet()
         p1 = SomeTestParser()
         p2 = RootTestParser()
@@ -200,12 +200,35 @@ class TestParserSetSelection:
         ps.add(p2)
         ps.add(p3)
 
-        ps.select(parser=[p1])
+        ps.select(parser=[SomeTestParser])
 
         assert len(ps.parsers) == 1
         assert len(ps._parser_stash) == 2
 
         assert p1 in ps.parsers
+        assert p2 in ps._parser_stash
+        assert p3 in ps._parser_stash
+
+    def test_parserset_selection_by_parser_class_mulitple_times(self):
+        # same parser class can exist in ParserSet multiple times (e.g. with different arguments)
+        ps = ParserSet()
+        p1 = SomeTestParser()
+        other_p1 = SomeTestParser()
+        p2 = RootTestParser()
+        p3 = DependingTestParser()
+
+        ps.add(p1)
+        ps.add(other_p1)
+        ps.add(p2)
+        ps.add(p3)
+
+        ps.select(parser=[SomeTestParser])
+
+        assert len(ps.parsers) == 2
+        assert len(ps._parser_stash) == 2
+
+        assert p1 in ps.parsers
+        assert other_p1 in ps.parsers
         assert p2 in ps._parser_stash
         assert p3 in ps._parser_stash
 
@@ -228,7 +251,7 @@ class TestParserSetSelection:
         assert p2 in ps._parser_stash
         assert p3 in ps._parser_stash
 
-    def test_parserset_selection_by_parser_instance_multiple_parsers(self):
+    def test_parserset_selection_by_parser_class_multiple_parsers(self):
         ps = ParserSet()
         p1 = SomeTestParser()
         p2 = RootTestParser()
@@ -238,7 +261,7 @@ class TestParserSetSelection:
         ps.add(p2)
         ps.add(p3)
 
-        ps.select(parser=[p1, p3])
+        ps.select(parser=[SomeTestParser, DependingTestParser])
 
         assert len(ps.parsers) == 2
         assert len(ps._parser_stash) == 1
@@ -266,6 +289,27 @@ class TestParserSetSerialize:
         reloaded_ps = ParserSet.deserialize(tmp_path, whitelist=[p1])
 
         assert len(reloaded_ps.parsers) == 1
+        assert p1.__class__.__name__ in [x.name for x in reloaded_ps.parsers]
+        assert p2.__class__.__name__ not in [x.name for x in reloaded_ps.parsers]
+        assert p3.__class__.__name__ not in [x.name for x in reloaded_ps.parsers]
+
+    def test_deserialize_whitelist_same_parser_multiple_times(self, tmp_path):
+        # same parser class can exist in ParserSet multiple times (e.g. with different arguments)
+        ps = ParserSet()
+        p1 = SomeTestParser()
+        p2 = RootTestParser()
+        p3 = DependingTestParser()
+
+        ps.add(p1)
+        ps.add(p1)
+        ps.add(p2)
+        ps.add(p3)
+
+        ps.serialize(tmp_path)
+
+        reloaded_ps = ParserSet.deserialize(tmp_path, whitelist=[p1])
+
+        assert len(reloaded_ps.parsers) == 2
         assert p1.__class__.__name__ in [x.name for x in reloaded_ps.parsers]
         assert p2.__class__.__name__ not in [x.name for x in reloaded_ps.parsers]
         assert p3.__class__.__name__ not in [x.name for x in reloaded_ps.parsers]
