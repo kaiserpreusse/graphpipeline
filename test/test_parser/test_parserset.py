@@ -246,3 +246,24 @@ class TestParserSetSelection:
         assert p1 in ps.parsers
         assert p2 in ps._parser_stash
         assert p3 in ps.parsers
+
+
+class TestParserSetSerialize:
+
+    def test_deserialize_whitelist(self, tmp_path):
+
+        ps = ParserSet()
+        p1 = SomeTestParser()
+        p2 = RootTestParser()
+        p3 = DependingTestParser()
+
+        ps.add(p1)
+        ps.add(p2)
+        ps.add(p3)
+
+        ps.serialize(tmp_path)
+
+        reloaded_ps = ParserSet.deserialize(tmp_path, whitelist=[p1])
+
+        assert len(reloaded_ps.parsers) == 1
+        assert p1.__class__.__name__ in [x.name for x in reloaded_ps.parsers]

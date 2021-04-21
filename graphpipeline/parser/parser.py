@@ -210,8 +210,6 @@ class Parser:
         log.debug(f"Read Parser from {source_dir}.")
         p = cls()
 
-        # TODO also read metadata
-
         for file in os.listdir(source_dir):
             if file.startswith('nodeset_'):
                 ns_name = file.replace('.json', '')
@@ -228,6 +226,12 @@ class Parser:
                     rs = RelationshipSet.from_dict(json.load(f))
                     log.debug(f"Num relationships in RelationshipSet: {len(rs.relationships)}")
                     p.__dict__[rs_name] = rs
+
+            elif file == 'parser_data.json':
+                with open(os.path.join(source_dir, file), 'rt') as f:
+                    metadata = json.load(f)
+                    # TODO add datasource instances to deserializer
+                    p.name = metadata['name']
 
         return p
 
