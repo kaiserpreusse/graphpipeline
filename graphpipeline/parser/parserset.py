@@ -3,6 +3,8 @@ from multiprocessing import Pool
 import logging
 import os
 
+from typing import List, Union
+
 from graphpipeline.parser import Parser
 from graphpipeline.parser.parser import run_parser_merge_nodes, run_and_serialize
 
@@ -18,6 +20,7 @@ class ParserSet:
 
     def __init__(self):
         self.parsers = []
+        self._parser_stash = []
 
     def add(self, parser: Parser):
         """
@@ -26,6 +29,30 @@ class ParserSet:
         :param parser: The parser, a subclass of graphpipeline.parser.Parser
         """
         self.parsers.append(parser)
+
+    def select(self, parser: List[Union[str, Parser]] = None):
+        """
+        Select a list of parsers by either name or parser instance, stash the others.
+
+        :param parser: List of parsers.
+        """
+        # select the parser that are passed
+        active_parsers = []
+        for selection in parser:
+            if isinstance(selection, str):
+                for p in self.parsers:
+                    if p.__class__.__name__ == selection:
+                        active_parsers.append(p)
+            elif isinstance(selection, Parser):
+                for p in parser:
+                    if p.__class__ == selection.__class__:
+                        active_parsers.append(p)
+        # stash the others
+        for p in self.parsers:
+            if p not in active_parsers:
+                self._parser_stash.append(p)
+        # set list of active parsers
+        self.parsers = active_parsers
 
     def run_with_mounted_arguments(self):
         """

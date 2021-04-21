@@ -187,3 +187,62 @@ def test_dependency_parserset_merge(clear_graph, graph):
 
     result = graph.run("MATCH (s:Source)-[r:FOO]->(t:Target) RETURN count(distinct r) AS count").data()
     assert result[0]['count'] == len(depending_parser.rels.relationships)
+
+
+class TestParserSetSelection:
+    def test_parserset_selection_by_parser_instance(self):
+        ps = ParserSet()
+        p1 = SomeTestParser()
+        p2 = RootTestParser()
+        p3 = DependingTestParser()
+
+        ps.add(p1)
+        ps.add(p2)
+        ps.add(p3)
+
+        ps.select(parser=[p1])
+
+        assert len(ps.parsers) == 1
+        assert len(ps._parser_stash) == 2
+
+        assert p1 in ps.parsers
+        assert p2 in ps._parser_stash
+        assert p3 in ps._parser_stash
+
+    def test_parserset_selection_by_name(self):
+        ps = ParserSet()
+        p1 = SomeTestParser()
+        p2 = RootTestParser()
+        p3 = DependingTestParser()
+
+        ps.add(p1)
+        ps.add(p2)
+        ps.add(p3)
+
+        ps.select(parser=[p1.__class__.__name__])
+
+        assert len(ps.parsers) == 1
+        assert len(ps._parser_stash) == 2
+
+        assert p1 in ps.parsers
+        assert p2 in ps._parser_stash
+        assert p3 in ps._parser_stash
+
+    def test_parserset_selection_by_parser_instance_multiple_parsers(self):
+        ps = ParserSet()
+        p1 = SomeTestParser()
+        p2 = RootTestParser()
+        p3 = DependingTestParser()
+
+        ps.add(p1)
+        ps.add(p2)
+        ps.add(p3)
+
+        ps.select(parser=[p1, p3])
+
+        assert len(ps.parsers) == 2
+        assert len(ps._parser_stash) == 1
+
+        assert p1 in ps.parsers
+        assert p2 in ps._parser_stash
+        assert p3 in ps.parsers
