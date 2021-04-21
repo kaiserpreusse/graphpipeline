@@ -39,18 +39,13 @@ class ParserSet:
         # select the parser that are passed
         active_parsers = []
         for selection in parser:
-            print(f"check {selection}")
             if isinstance(selection, str):
                 for p in self.parsers:
                     if p.__class__.__name__ == selection:
                         active_parsers.append(p)
             elif isinstance(selection, type):
-                print('check class')
                 for p in self.parsers:
-                    print(p)
-                    print(selection)
                     if isinstance(p, selection):
-                        print('match found')
                         active_parsers.append(p)
         # stash the others
         for p in self.parsers:
