@@ -74,6 +74,33 @@ class TestSerialization:
         assert len(tp.container.nodesets) == len(reloaded_tp.container.nodesets)
         assert len(tp.container.relationshipsets) == len(reloaded_tp.container.relationshipsets)
 
+    def test_overwrite(self, tmp_path):
+        tp = SomeParser()
+        tp.run()
+        tp.serialize(str(tmp_path))
+
+        files_first = os.listdir(tmp_path)
+
+        tp.serialize(str(tmp_path))
+
+        files_second = os.listdir(tmp_path)
+
+        assert len(files_first) == len(files_second)
+        assert len([x for x in files_first if x.startswith('nodeset')]) == len([x for x in files_second if x.startswith('nodeset')])
+        assert len([x for x in files_first if x.startswith('relationshipset')]) == len([x for x in files_second if x.startswith('relationshipset')])
+
+    def test_other_file_not_deleted_on_overwrite(self, tmp_path):
+        # put other file in tmp_path
+        with open(os.path.join(tmp_path, 'test.txt'), 'wt') as f:
+            f.write('foo')
+
+        tp = SomeParser()
+        tp.run()
+        tp.serialize(str(tmp_path))
+        tp.serialize(str(tmp_path))
+        tp.serialize(str(tmp_path))
+
+        assert os.path.exists(os.path.join(tmp_path, 'test.txt'))
 
 def test_parser_arguments():
     p = ReturnParser()

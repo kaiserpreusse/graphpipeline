@@ -175,10 +175,13 @@ class Parser:
 
         return output
 
-    def serialize(self, target_dir: str):
+    def serialize(self, target_dir: str, overwrite: bool = True):
         """
         Store the Parser with output in a directory.
+
+        Default behaviour is to delete existing nodeset/relationship set files in the target directory.
         """
+
         # serializer for datetime
         def json_serial(obj):
             if isinstance(obj, (datetime, date)):
@@ -186,6 +189,17 @@ class Parser:
             raise TypeError("Type %s not serializable" % type(obj))
 
         output_dir = os.path.join(target_dir, self._serialization_dir_name())
+        # clean output directory
+        if overwrite:
+            if os.path.exists(output_dir):
+                for f in os.listdir(output_dir):
+                    if f.startswith('nodeset_') and f.endswith('.json'):
+                        os.remove(os.path.join(output_dir, f))
+                    if f.startswith('relationshipset_') and f.endswith('.json'):
+                        os.remove(os.path.join(output_dir, f))
+                    if f == 'parser_data.json':
+                        os.remove(os.path.join(output_dir, f))
+
         if not os.path.exists(output_dir):
             os.mkdir(output_dir)
 
