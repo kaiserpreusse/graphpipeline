@@ -453,7 +453,12 @@ class RollingReleaseRemoteDataSource(RemoteDataSource):
         return instance
 
 
-class ManyVersionsRemoteDataSource(RemoteDataSource):
+class VersionedRemoteDataSource(RemoteDataSource):
+    def __init__(self, root_dir):
+        super(VersionedRemoteDataSource, self).__init__(root_dir)
+
+
+class ManyVersionsRemoteDataSource(VersionedRemoteDataSource):
 
     def __init__(self, root_dir):
         super(ManyVersionsRemoteDataSource, self).__init__(root_dir)
@@ -504,7 +509,7 @@ class ManyVersionsRemoteDataSource(RemoteDataSource):
         return instance
 
 
-class SingleVersionRemoteDataSource(RemoteDataSource):
+class SingleVersionRemoteDataSource(VersionedRemoteDataSource):
     """
     DataSource class for a remote data source with defined versions where only
     one (usually the last one) version can be downloaded.
