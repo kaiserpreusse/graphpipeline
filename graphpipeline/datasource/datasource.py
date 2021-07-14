@@ -145,6 +145,10 @@ class BaseDataSource():
         else:
             self.name = self.__class__.__name__
 
+        self.arguments = []
+        self.argument_types = {}
+        self.allowed_values = {}
+
         # set the data source directory (using class name)
         self._ds_dir = os.path.join(self.root_dir, self.name)
 
@@ -344,6 +348,9 @@ class RemoteDataSource(BaseDataSource):
     def latest_remote_version(self):
         return None
 
+    def all_remote_versions(self):
+        raise NotImplementedError
+
     def download(self):
         raise NotImplementedError
 
@@ -407,10 +414,17 @@ class RemoteDataSource(BaseDataSource):
 
         return out
 
+
 class RollingReleaseRemoteDataSource(RemoteDataSource):
 
     def __init__(self, root_dir):
         super(RollingReleaseRemoteDataSource, self).__init__(root_dir)
+
+    def all_remote_versions(self):
+        return self.latest_remote_version()
+
+    def latest_remote_version(self):
+        return None
 
     def download(self, *args, **kwargs):
         if not kwargs:
@@ -501,6 +515,9 @@ class SingleVersionRemoteDataSource(RemoteDataSource):
 
     def __init__(self, root_dir):
         super(SingleVersionRemoteDataSource, self).__init__(root_dir)
+
+    def all_remote_versions(self):
+        return self.latest_remote_version()
 
     def latest_remote_version(self):
         raise NotImplementedError

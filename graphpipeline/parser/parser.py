@@ -183,12 +183,15 @@ class Parser:
         """
 
         # serializer for datetime
+        serialization_dir_name = self._serialization_dir_name()
+        log.debug(f"Serialize {self.__class__.__name__} to {target_dir}/{serialization_dir_name}. Overwrite is {overwrite}.")
+
         def json_serial(obj):
             if isinstance(obj, (datetime, date)):
                 return obj.isoformat()
             raise TypeError("Type %s not serializable" % type(obj))
 
-        output_dir = os.path.join(target_dir, self._serialization_dir_name())
+        output_dir = os.path.join(target_dir, serialization_dir_name)
         # clean output directory
         if overwrite:
             if os.path.exists(output_dir):
